@@ -55,12 +55,12 @@ the most expensive, most capable model in the pipeline.
 
 ```
 LLM Agent (e.g. Claude Code)
-   │
-   ▼
-jevXagent Proxy ── detect / extract context / decide routing
-   │
-   ├──► JEV      fast, simple decisions (structured YES/NO, choice, label)
-   └──► Claude   complex reasoning, planning, coding, synthesis
+   |
+   v
+jevXagent Proxy -- detect / extract context / decide routing
+   |
+   +--> JEV      fast, simple decisions (structured YES/NO, choice, label)
+   +--> Claude   complex reasoning, planning, coding, synthesis
 ```
 
 ### Research hypothesis (to be tested, not assumed)
@@ -79,18 +79,18 @@ estimate; every measured number comes from a real recorded call.
 ## Architecture
 
 ```
-                        ┌──────────────────────────────┐
- Claude Code ──────────►│ jevXagent (FastAPI + httpx) │
-   (Anthropic API)      │                              │
-                        │  /v1/messages  transparent   │──► Claude API
-                        │               relay (SSE)    │
-                        │                              │
-                        │  /v1/decision  router        │──► JEV   (fast decisions)
-                        │               + fallback ────┘──► Claude (fallback/baseline)
-                        │                              │
-                        │  telemetry store (SQLite)    │
-                        │  statistics CLI              │
-                        └──────────────────────────────┘
+                        +------------------------------+
+ Claude Code ---------->| jevXagent (FastAPI + httpx) |
+   (Anthropic API)      |                              |
+                        |  /v1/messages  transparent   |--> Claude API
+                        |               relay (SSE)    |
+                        |                              |
+                        |  /v1/decision  router        |--> JEV   (fast decisions)
+                        |               + fallback ----+--> Claude (fallback/baseline)
+                        |                              |
+                        |  telemetry store (SQLite)    |
+                        |  statistics CLI              |
+                        +------------------------------+
 ```
 
 Design principles (enforced in code):
@@ -112,14 +112,14 @@ Design principles (enforced in code):
 
 | Area | Status |
 |---|---|
-| Transparent Anthropic-compatible proxy (`/v1/messages`, SSE streaming) | ✅ **Working**, verified with a real Claude Code session |
-| Telemetry: request + decision records (latency, API-reported tokens, fallbacks) | ✅ Working |
-| Statistics CLI dashboard, charts, export, report, reset | ✅ Working |
-| Decision routing endpoint `/v1/decision` (Claude path live-tested) | ✅ Working |
-| JEV provider | ⏸ Implemented, **disabled** — waiting for a real JEV API |
-| Benchmark mode | ✅ Implemented (requires configured providers) |
-| In-conversation interception (MCP tool) | 📋 Planned, see [Roadmap](#roadmap) |
-| Kilo Code support | 📋 Planned, see [Roadmap](#roadmap) |
+| Transparent Anthropic-compatible proxy (`/v1/messages`, SSE streaming) | **Working**, verified with a real Claude Code session |
+| Telemetry: request + decision records (latency, API-reported tokens, fallbacks) | Working |
+| Statistics CLI dashboard, charts, export, report, reset | Working |
+| Decision routing endpoint `/v1/decision` (Claude path live-tested) | Working |
+| JEV provider | Implemented, **disabled** — waiting for a real JEV API |
+| Benchmark mode | Implemented (requires configured providers) |
+| In-conversation interception (MCP tool) | Planned, see [Roadmap](#roadmap) |
+| Kilo Code support | Planned, see [Roadmap](#roadmap) |
 
 ## Quickstart
 
