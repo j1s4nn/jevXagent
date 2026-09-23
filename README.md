@@ -1,9 +1,13 @@
 # jevXagent — When JEV Meets LLM Agent
 
-A local LLM proxy that sits between an LLM agent (e.g. **Claude Code**) and its
-primary LLM API. The primary model (Claude) keeps **global context** and does
-**complex reasoning**; a fast auxiliary model (**JEV**) acts as a
-**decision coprocessor** for suitable low-complexity operations.
+A local **LLM proxy / AI agent middleware** that sits between an LLM agent such
+as **Claude Code** and its primary LLM API (Anthropic-compatible). The primary
+model (Claude) keeps **global context** and does **complex reasoning**; a fast
+auxiliary model (**JEV**) acts as a **decision coprocessor** for suitable
+low-complexity decisions. Built-in **decision routing**, **observability
+(telemetry)**, **statistics dashboard**, and **benchmarking** let you measure
+whether routing actually reduces **latency**, **token usage**, and **cost** for
+agentic workflows.
 
 > **Status:** Phase 1 (transparent proxy) **works** and is verified against a
 > real Claude Code session. Decision routing, telemetry and statistics are
