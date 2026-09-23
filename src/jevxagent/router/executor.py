@@ -12,16 +12,73 @@ import re
 from typing import Optional
 
 from ..config import Settings
-from ..context.extractor import build_decision_prompt
-from ..providers.base import JevDecision, ProviderError
+from ..context.extractor import build_decision_prompt, trim_context
+from ..providers.base import JevAnswer, ProviderError
 from ..providers.claude import ClaudeProvider
 from ..providers.jev import JevProvider
 from ..telemetry.events import DecisionRecord, RoutingStatus
 from ..telemetry.storage import TelemetryStore
 from .decision import DecisionEvent
 from .policy import RoutingPolicy
+from .verification import evaluate as evaluate_verdict
 
 _JSON_BLOCK_RE = re.compile(r"\{.*\}", re.DOTALL)
+
+_PRIMARY_QUESTION = "decision"
+
+
+def _dedupe_options(options: list[str]) -> list[str]:
+    seen: set[str] = set()
+    out: list[str] = []
+    for option in options:
+        if option not in seen:
+            seen.add(option)
+            out.append(option)
+    return out
+
+
+def build_jev_questions(event: DecisionEvent, settings: Settings) -> tuple[str, dict]:
+    """Map a DecisionEvent into a JEV Decisions request: (state, questions).
+
+    JEV answers *typed* questions, so the event is translated into the closest
+    JEV primitive:
+
+    - ``score`` format + options  -> ordered-rubric ``score`` question
+    - options present             -> ``choice`` question
+    - otherwise (incl. yes/no)    -> ``noul`` question
+    """
+    state = trim_context(event.context or "", settings.jev_max_context_chars).strip()
+    instructions = (event.current_operation or "").strip()
+    if not state:
+        state = instructions or " "
+
+    options = _dedupe_options(event.options or [])
+
+    if event.answer_format == "score" and options:
+        return state, {
+            _PRIMARY_QUESTION: {
+                "type": "score",
+                "instructions": instructions,
+                "criteria": options,
+            }
+        }
+
+    if options:
+        return state, {
+            _PRIMARY_QUESTION: {
+                "type": "choice",
+                "instructions": instructions,
+                "criteria": {option: option for option in options},
+            }
+        }
+
+    return state, {
+        _PRIMARY_QUESTION: {
+            "type": "noul",
+            "instructions": instructions,
+            "criteria": {"true": "YES", "false": "NO"},
+        }
+    }
 
 
 class DecisionExecutor:
@@ -61,19 +118,26 @@ class DecisionExecutor:
         return await self._execute_claude(event, fallback_reason=fallback_reason)
 
     async def _execute_jev(self, event: DecisionEvent) -> dict:
-        prompt = build_decision_prompt(
-            event.current_operation,
-            event.options or None,
-            event.context,
-            event.answer_format,
-            self._settings,
-        )
-        result: JevDecision = await self._jev.decide(prompt)
-        event.confidence = result.confidence
+        state, questions = build_jev_questions(event, self._settings)
+        result = await self._jev.decide(state, questions)
 
-        if not self._policy.confidence_ok(result.confidence):
+        answer = result.answer(_PRIMARY_QUESTION)
+        if answer is None:
+            raise ProviderError(f"JEV response missing primary '{_PRIMARY_QUESTION}' answer")
+
+        decision, choice, confidence = self._interpret_answer(answer, event)
+        event.confidence = confidence
+
+        verdict = evaluate_verdict(event, decision)
+        meta = self._decision_meta(event)
+        meta["jev_choice"] = decision
+        if verdict.label is not None:
+            meta["agreement"] = verdict.agreement
+            meta["verdict"] = verdict.label
+
+        if not self._policy.confidence_ok(confidence):
             error = ProviderError(
-                f"JEV confidence {result.confidence} below threshold "
+                f"JEV confidence {confidence} below threshold "
                 f"{self._settings.jev_confidence_threshold}"
             )
             error.jev_attempt_ms = result.latency_ms
@@ -86,19 +150,19 @@ class DecisionExecutor:
             route="jev",
             routing_status=event.routing_status.value,
             fallback=False,
-            confidence=result.confidence,
+            confidence=confidence,
             status="success",
             jev_ms=result.latency_ms,
             jev_input_tokens=result.input_tokens,
             jev_output_tokens=result.output_tokens,
-            meta=self._decision_meta(event),
+            meta=meta,
         )
         self._store.record_decision(record)
 
         return {
-            "decision": result.decision,
-            "choice": result.choice,
-            "confidence": result.confidence,
+            "decision": decision,
+            "choice": choice,
+            "confidence": confidence,
             "provider": "jev",
             "fallback": False,
             "routing_status": event.routing_status.value,
@@ -106,7 +170,43 @@ class DecisionExecutor:
             "complexity": round(event.complexity, 3),
             "latency_ms": round(result.latency_ms, 1),
             "request_id": event.request_id,
+            "jev_model": result.model,
+            "jev_provider": result.provider,
+            "probabilities": answer.probabilities,
+            "verdict": verdict.label,
+            "agreement": verdict.agreement,
         }
+
+    @staticmethod
+    def _interpret_answer(answer: JevAnswer, event: DecisionEvent) -> tuple[str, str | None, float | None]:
+        """Convert a typed JEV answer into (decision, choice, confidence)."""
+        if answer.type == "noul":
+            noul = answer.noul if answer.noul is not None else 0.5
+            decision = "YES" if noul >= 0.5 else "NO"
+            confidence = max(noul, 1.0 - noul)
+            return decision, None, confidence
+
+        if answer.type == "choice":
+            key = answer.choice or ""
+            confidence = answer.confidence
+            if confidence is None and answer.probabilities:
+                confidence = max(answer.probabilities.values())
+            return key, key, confidence
+
+        if answer.type == "score":
+            score = answer.score if answer.score is not None else 0.0
+            options = _dedupe_options(event.options or [])
+            label = str(score)
+            if options:
+                idx = int(round(score))
+                idx = max(0, min(len(options) - 1, idx))
+                label = options[idx]
+            confidence = answer.confidence
+            if confidence is None and answer.probabilities:
+                confidence = max(answer.probabilities.values())
+            return label, None, confidence
+
+        raise ProviderError(f"JEV answer has unsupported type '{answer.type}'")
 
     async def _execute_claude(self, event: DecisionEvent, fallback_reason: str = "") -> dict:
         prompt = build_decision_prompt(
@@ -135,6 +235,11 @@ class DecisionExecutor:
 
         is_fallback = bool(fallback_reason)
         jev_attempt_ms = event.payload.get("jev_attempt_ms")
+        meta = self._decision_meta(event, fallback_reason=fallback_reason)
+        verdict_label = None
+        if is_fallback and event.source == "intercept":
+            verdict_label = "jev_unavailable"
+            meta["verdict"] = verdict_label
         record = DecisionRecord(
             request_id=event.request_id,
             decision_type=event.decision_type.value,
@@ -148,7 +253,7 @@ class DecisionExecutor:
             claude_input_tokens=_usage_int(response.body, "input_tokens"),
             claude_output_tokens=_usage_int(response.body, "output_tokens"),
             error=(fallback_reason or parse_error or _upstream_error(response.body)),
-            meta=self._decision_meta(event, fallback_reason=fallback_reason),
+            meta=meta,
         )
         self._store.record_decision(record)
 
@@ -163,10 +268,16 @@ class DecisionExecutor:
             "complexity": round(event.complexity, 3),
             "latency_ms": round(response.latency_ms, 1),
             "request_id": event.request_id,
+            "verdict": verdict_label,
+            "agreement": None,
         }
 
     def _decision_meta(self, event: DecisionEvent, fallback_reason: str = "") -> dict:
-        meta: dict = {"complexity": round(event.complexity, 3)}
+        meta: dict = {"complexity": round(event.complexity, 3), "source": event.source}
+        if event.conversation_id:
+            meta["conversation_id"] = event.conversation_id
+        if event.candidate_action:
+            meta["candidate_action"] = event.candidate_action
         if fallback_reason:
             meta["fallback_reason"] = fallback_reason
         if self._settings.store_decision_context and event.context:

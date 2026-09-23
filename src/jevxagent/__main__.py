@@ -41,6 +41,7 @@ def main(argv: list[str] | None = None) -> int:
     add_statistics_parser(sub)
     add_benchmark_parser(sub)
     sub.add_parser("version", help="print version")
+    sub.add_parser("mcp", help="run the jevx_decide MCP server (stdio)")
 
     args = parser.parse_args(argv)
     if args.command in ("statistics", "stats"):
@@ -49,6 +50,11 @@ def main(argv: list[str] | None = None) -> int:
         return args.func(args)
     if args.command == "version":
         print(f"jevXagent {__version__}")
+        return 0
+    if args.command == "mcp":
+        from .mcp_server import main as mcp_main
+
+        mcp_main()
         return 0
     if args.command in (None, "serve"):
         return _serve(args)

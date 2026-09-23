@@ -26,7 +26,8 @@ class DecisionEvent:
     confidence: Optional[float] = None
     routing_status: RoutingStatus = RoutingStatus.NOT_ROUTED
     options: list[str] = field(default_factory=list)
-    answer_format: str = "decision"  # "decision" | "choice" | "label"
+    answer_format: str = "decision"  # "decision" | "choice" | "label" | "yesno" | "score" | "noul"
+    source: str = "manual"  # "manual" (POST /v1/decision) | "intercept" (messages workflow)
     payload: dict[str, Any] = field(default_factory=dict)
 
     def to_json(self) -> dict:
@@ -40,4 +41,5 @@ class DecisionEvent:
             "routing_status": self.routing_status.value,
             "current_operation": self.current_operation,
             "candidate_action": self.candidate_action,
+            "source": self.source,
         }

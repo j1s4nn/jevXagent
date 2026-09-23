@@ -14,6 +14,7 @@ can be added alongside this one later.
 
 from __future__ import annotations
 
+import json
 from typing import Optional
 
 import httpx
@@ -105,6 +106,38 @@ class SseUsageCollector:
             usage = parse_usage_from_sse(line.split(":", 1)[1].strip())
             for key, value in usage.items():
                 self.usage[key] = value
+
+
+class SseToolCollector:
+    """Collects tool-selection signals from an SSE stream, without buffering
+    the full conversation.
+
+    After the stream ends, this exposes the tools Claude selected (from
+    ``content_block_start`` frames) and the ``stop_reason`` (from
+    ``message_delta``). Used only for observable decision-event detection.
+    """
+
+    def __init__(self) -> None:
+        self.tool_names: list[str] = []
+        self.stop_reason: str | None = None
+
+    def on_line(self, line: str) -> None:
+        if not line.startswith("data:"):
+            return
+        try:
+            frame = json.loads(line.split(":", 1)[1].strip())
+        except json.JSONDecodeError:
+            return
+        if not isinstance(frame, dict):
+            return
+        if frame.get("type") == "content_block_start":
+            block = frame.get("content_block")
+            if isinstance(block, dict) and block.get("type") == "tool_use" and block.get("name"):
+                self.tool_names.append(str(block["name"]))
+        elif frame.get("type") == "message_delta":
+            delta = frame.get("delta")
+            if isinstance(delta, dict) and delta.get("stop_reason"):
+                self.stop_reason = str(delta["stop_reason"])
 
 
 def parse_content_types(payload: dict) -> str:

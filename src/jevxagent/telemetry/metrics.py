@@ -64,6 +64,26 @@ def category_breakdown(decisions: list[dict]) -> dict:
     return by_type
 
 
+def agreement_stats(decisions: list[dict]) -> dict:
+    """JEV-vs-Claude agreement over intercepted decisions that were verified.
+
+    Only decisions with a `verdict` of "agree" or "disagree" are comparable
+    (i.e. intercepted tool selections where JEV succeeded). "jev_unavailable"
+    and manual decisions are excluded from the rate.
+    """
+    compared = [d for d in decisions if (d.get("meta") or {}).get("verdict") in ("agree", "disagree")]
+    agree = [d for d in compared if d["meta"]["verdict"] == "agree"]
+    disagree = [d for d in compared if d["meta"]["verdict"] == "disagree"]
+    unavailable = [d for d in decisions if (d.get("meta") or {}).get("verdict") == "jev_unavailable"]
+    return {
+        "compared": len(compared),
+        "agree": len(agree),
+        "disagree": len(disagree),
+        "unavailable": len(unavailable),
+        "agreement_rate": round(len(agree) / len(compared) * 100, 1) if compared else None,
+    }
+
+
 def _local_day(ts: float) -> str:
     return time.strftime("%Y-%m-%d", time.localtime(ts))
 

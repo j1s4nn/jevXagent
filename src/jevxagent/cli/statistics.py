@@ -104,6 +104,7 @@ def run(args: argparse.Namespace) -> int:
             "generated": stats["generated"],
             "routing": stats["routing"],
             "breakdown": stats["breakdown"],
+            "agreement": stats.get("agreement", {}),
             "series": stats["series"],
             "tokens": stats["tokens"],
             "savings": stats["savings"],
@@ -138,6 +139,7 @@ def render_dashboard(stats: dict) -> str:
     tokens = stats["tokens"]
     savings = stats["savings"]
     evidence = stats["evidence"]
+    agreement = stats.get("agreement", {})
     total = routing["total_decisions"]
 
     def rate(num: int) -> str:
@@ -158,6 +160,12 @@ def render_dashboard(stats: dict) -> str:
         row("Claude handled", f"{routing['claude_handled']}"),
         row("JEV fallback", f"{routing['jev_fallback']}"),
         row("JEV routing rate", rate(routing["jev_handled"])),
+        "╠═══════════════════════════════════════════════════════╣",
+        row("Verification: compared", f"{agreement.get('compared', 0)}"),
+        row("  JEV agrees with Claude", f"{agreement.get('agree', 0)}"),
+        row("  JEV disagrees", f"{agreement.get('disagree', 0)}"),
+        row("  JEV unavailable", f"{agreement.get('unavailable', 0)}"),
+        row("Agreement rate", _cell(agreement.get('agreement_rate'), "%")),
         "╠═══════════════════════════════════════════════════════╣",
         row("Messages proxied (via Claude)", f"{messages_proxied}"),
         "╠═══════════════════════════════════════════════════════╣",

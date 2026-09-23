@@ -37,22 +37,51 @@ class StreamResponse:
 
 
 @dataclass
-class JevDecision:
-    """Structured, validated result from the JEV provider."""
+class JevAnswer:
+    """One typed answer returned by the JEV Decisions API.
 
-    decision: str
+    The Decisions API answers *typed* questions about a state. Each answer is
+    tagged with a `type` and carries the fields relevant to that type:
+
+    - ``noul``   -> ``noul`` (probability 0..1 that the answer is "yes")
+    - ``choice`` -> ``choice`` (criterion key) + ``probabilities`` distribution
+    - ``score``  -> ``score`` (position on an ordered rubric) + ``probabilities``
+    """
+
+    type: str  # "choice" | "noul" | "score"
+    noul: float | None = None
     choice: str | None = None
+    score: float | None = None
+    probabilities: dict[str, float] = field(default_factory=dict)
     confidence: float | None = None
+    legend: dict[str, str] = field(default_factory=dict)
+
+
+@dataclass
+class JevDecideResult:
+    """Structured result from the JEV Decisions API.
+
+    Preserves the answers plus useful metadata returned by JEV/OpenRouter:
+    probabilities, per-answer confidence, model, provider, usage.
+    """
+
+    answers: dict[str, JevAnswer] = field(default_factory=dict)
+    model: str = ""
+    provider: str = ""
+    usage: dict = field(default_factory=dict)
+    id: str = ""
     raw: str = ""
     latency_ms: float = 0.0
-    usage: dict = field(default_factory=dict)
+
+    def answer(self, name: str) -> JevAnswer | None:
+        return self.answers.get(name)
 
     @property
     def input_tokens(self) -> int | None:
-        value = self.usage.get("prompt_tokens")
+        value = self.usage.get("input_tokens")
         return int(value) if isinstance(value, (int, float)) else None
 
     @property
     def output_tokens(self) -> int | None:
-        value = self.usage.get("completion_tokens")
+        value = self.usage.get("output_tokens")
         return int(value) if isinstance(value, (int, float)) else None

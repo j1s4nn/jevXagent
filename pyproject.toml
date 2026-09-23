@@ -30,6 +30,9 @@ dev = [
     "pytest>=8",
     "pytest-asyncio>=0.23",
 ]
+mcp = [
+    "mcp>=1.0,<3",
+]
 
 [project.scripts]
 jevXagent = "jevxagent.__main__:main"

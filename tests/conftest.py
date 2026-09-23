@@ -49,6 +49,39 @@ def message_response(payload: dict) -> dict:
     }
 
 
+def tool_use_response(name: str, stop_reason: str = "tool_use") -> dict:
+    return {
+        "type": "message",
+        "id": "msg_tool",
+        "role": "assistant",
+        "content": [{"type": "tool_use", "id": "tu_1", "name": name, "input": {}}],
+        "stop_reason": stop_reason,
+        "usage": {"input_tokens": 40, "output_tokens": 8},
+    }
+
+
+TOOL_USE_SSE_BODY = (
+    "event: message_start\n"
+    'data: {"type":"message_start","message":{"id":"msg_1","type":"message","role":"assistant",'
+    '"usage":{"input_tokens":10}}}\n'
+    "\n"
+    "event: content_block_start\n"
+    'data: {"type":"content_block_start","index":0,"content_block":{"type":"tool_use","id":"tu_1","name":"Bash","input":{}}}\n'
+    "\n"
+    "event: content_block_delta\n"
+    'data: {"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":""}}\n'
+    "\n"
+    "event: content_block_stop\n"
+    'data: {"type":"content_block_stop","index":0}\n'
+    "\n"
+    "event: message_delta\n"
+    'data: {"type":"message_delta","delta":{"stop_reason":"tool_use"},"usage":{"output_tokens":5}}\n'
+    "\n"
+    "event: message_stop\n"
+    'data: {"type":"message_stop"}\n'
+)
+
+
 class FakeClaudeTransport(httpx.MockTransport):
     """Records requests and emulates an Anthropic-compatible upstream."""
 
@@ -56,6 +89,10 @@ class FakeClaudeTransport(httpx.MockTransport):
         self.seen: list[httpx.Request] = []
         self.status_override = status_override
         self.error_body = error_body
+        # Queue of tool names for non-stream tool_use responses (None = plain text)
+        self.tool_use_queue: list[str | None] = []
+        # When True, streaming requests return a tool_use SSE body instead of text
+        self.stream_tool_use = False
         super().__init__(self._handler)
 
     def _handler(self, request: httpx.Request) -> httpx.Response:
@@ -76,9 +113,10 @@ class FakeClaudeTransport(httpx.MockTransport):
             )
         payload = json.loads(request.content)
         if payload.get("stream"):
+            body = TOOL_USE_SSE_BODY if self.stream_tool_use else SSE_BODY
             return httpx.Response(
                 200,
-                content=SSE_BODY.encode(),
+                content=body.encode(),
                 headers={"content-type": "text/event-stream"},
             )
         if payload.get("messages"):
@@ -95,33 +133,45 @@ class FakeClaudeTransport(httpx.MockTransport):
                         "usage": {"input_tokens": 40, "output_tokens": 8},
                     },
                 )
+        if self.tool_use_queue:
+            tool = self.tool_use_queue.pop(0)
+            if tool:
+                return httpx.Response(200, json=tool_use_response(tool))
         return httpx.Response(200, json=message_response(payload))
 
 
 class FakeJevTransport(httpx.MockTransport):
+    """Emulates the JEV Decisions API (structured answers, not chat text)."""
+
     def __init__(
         self,
-        content: str = '{"decision": "YES", "confidence": 0.98}',
+        answers: dict | None = None,
         status: int = 200,
         raise_error: Exception | None = None,
+        body: dict | None = None,
     ):
         self.seen: list[httpx.Request] = []
-        self.content = content
+        self.answers = answers
         self.status = status
         self.raise_error = raise_error
+        self.body = body  # raw response override (for malformed responses)
         super().__init__(self._handler)
+
+    def _default(self) -> dict:
+        return {
+            "id": "gen-dec-test",
+            "model": "typesafe/jev-1.13",
+            "provider": "TypeSafe",
+            "answers": self.answers or {"decision": {"type": "noul", "noul": 0.98}},
+            "usage": {"input_tokens": 427, "output_tokens": 73},
+        }
 
     def _handler(self, request: httpx.Request) -> httpx.Response:
         self.seen.append(request)
         if self.raise_error is not None:
             raise self.raise_error
-        return httpx.Response(
-            self.status,
-            json={
-                "choices": [{"message": {"content": self.content}}],
-                "usage": {"prompt_tokens": 20, "completion_tokens": 5},
-            },
-        )
+        payload = self.body if self.body is not None else self._default()
+        return httpx.Response(self.status, json=payload)
 
 
 @pytest.fixture

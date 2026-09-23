@@ -259,26 +259,91 @@ All configuration is environment-based (`.env` supported). See
 
 ## JEV integration
 
-JEV is not yet reachable: at the time of writing the JEV server has no login
-system, so the `JEV_API_KEY` in `.env` is a **placeholder**
-(`aaaaaabbbbbbbcccccccddddddeeeeeeffffff`).
+JEV is a **structured decision model** served by OpenRouter via the Decisions
+API. It does not generate text — it answers *typed* questions about a `state`
+and returns calibrated probabilities.
 
-When you receive a real JEV API key:
+Configuration:
 
-1. Open `.env` and set `JEV_API_KEY`, `JEV_BASE_URL`, `JEV_MODEL`.
-2. Open [`src/jevxagent/providers/jev.py`](src/jevxagent/providers/jev.py)
-   — the **"JEV API SUBMISSION POINT"** is marked at the top of the file.
-   It currently assumes an OpenAI-compatible
-   `POST {JEV_BASE_URL}/v1/chat/completions` with
-   `Authorization: Bearer <key>`. **Verify this against the real JEV docs**
-   and adjust `build_request()` / `_parse()` if the protocol differs.
-3. Set `JEV_ENABLED=true` and `ROUTING_ENABLED=true` in `.env`.
-4. Test connectivity directly:
+```env
+JEV_API_KEY=sk-or-v1-...
+JEV_BASE_URL=https://openrouter.ai/api/alpha/decisions
+JEV_MODEL=typesafe/jev-1.13
+JEV_ENABLED=true
+ROUTING_ENABLED=true
+```
 
-   ```powershell
-   curl.exe http://127.0.0.1:8787/healthz
-   # jev_configured should become true
-   ```
+The provider (`src/jevxagent/providers/jev.py`) POSTs to `JEV_BASE_URL` with:
+
+```json
+{
+  "model": "typesafe/jev-1.13",
+  "state": "...",
+  "questions": {
+    "decision": {
+      "type": "choice",
+      "instructions": "...",
+      "criteria": { "option_a": "...", "option_b": "..." }
+    }
+  }
+}
+```
+
+and parses the structured `answers` (types: `choice`, `noul`, `score`), keeping
+probabilities, confidence, model, provider and usage. Verify connectivity:
+
+```powershell
+curl.exe http://127.0.0.1:8787/healthz
+# jev_configured should become true
+
+python scripts/smoke_jev.py   # real end-to-end decision against JEV
+```
+
+### Automatic workflow interception
+
+Beyond the manual endpoint, the proxy can **observe real Claude Code traffic**
+and route eligible decisions to JEV automatically. When Claude's response to
+`/v1/messages` contains a `tool_use` block, the proxy detects a
+`tool_selection` decision event (candidates = the request's declared `tools`)
+and routes it to JEV in the background — non-blocking, never touching
+streaming or the critical path.
+
+```env
+INTERCEPT_ENABLED=true   # requires JEV_ENABLED=true and ROUTING_ENABLED=true
+```
+
+Each detected event is recorded with `source=intercept`, a best-effort
+`conversation_id` (fingerprint of the first user message), and
+`candidate_action` (the tool Claude actually chose), so JEV-vs-Claude agreement
+can later be measured. Only observable agent-interaction boundaries are
+intercepted — never internal tokens, logits, or hidden reasoning.
+
+#### Verification (JEV vs Claude agreement)
+
+Every intercepted decision is also tagged with a `verdict`:
+
+- `agree` — JEV chose the same tool as Claude.
+- `disagree` — JEV chose a different tool (logged as `jev_disagreement`).
+- `jev_unavailable` — JEV failed/timeout/low-confidence, fell back to Claude.
+
+Agreement is reported in `jevXagent statistics` (and `--report` / `--export`)
+as the agreement rate. It is advisory: the proxy flags and records, it never
+blocks or rewrites traffic.
+
+#### MCP `jevx_decide` tool
+
+For decision events that are **not observable** at the `/v1/messages` boundary
+(e.g. file selection, relevance, verification), expose a `jevx_decide` MCP tool
+that Claude Code can call mid-conversation:
+
+```powershell
+# register once
+claude mcp add jevxagent -- python -m jevxagent mcp
+```
+
+The tool accepts `question`, `options`, `context`, `format`, `decision_type`
+and returns the same structured decision as `/v1/decision` (choice / noul /
+score with probabilities), routed through the existing `DecisionExecutor`.
 
 ## Decision routing API
 
@@ -303,7 +368,7 @@ Content-Type: application/json
 | `question` | The decision question (required) |
 | `context` | Optional supporting context (trimmed before JEV) |
 | `options` | Optional list of choices (multiple-choice routing) |
-| `format` | `decision` (default), `yesno`, `choice`, `label` |
+| `format` | `decision` (default), `yesno`, `choice`, `label`, `score`, `noul` |
 | `decision_type` | Optional explicit type; if empty, inferred deterministically |
 
 Response:
@@ -340,8 +405,9 @@ JEV is used only when **all** of these hold:
 
 and the JEV response:
 
-- parses as valid JSON with a `decision` field
-- has `confidence` ≥ `JEV_CONFIDENCE_THRESHOLD`
+- parses as a structured Decisions response with typed `answers`
+- has `confidence` ≥ `JEV_CONFIDENCE_THRESHOLD` (or a calibrated probability
+  for `noul` answers)
 - arrives before `JEV_TIMEOUT_S`
 
 In **every** other case the decision is handled by Claude. Quality first.
@@ -443,7 +509,7 @@ jevXagent/
 │   │   └── anthropic.py     # Anthropic protocol knowledge (more adapters can be added)
 │   ├── providers/
 │   │   ├── claude.py        # upstream Messages client (streaming)
-│   │   └── jev.py           # JEV client — marked "JEV API SUBMISSION POINT"
+│   │   └── jev.py           # JEV client — OpenRouter Decisions API
 │   ├── router/
 │   │   ├── decision.py      # DecisionEvent abstraction
 │   │   ├── classifier.py    # deterministic type + complexity inference

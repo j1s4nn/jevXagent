@@ -46,12 +46,62 @@ async def test_decision_multiple_choice_jev(client, settings):
     assert body["decision_type"] == "multiple_choice"
 
 
+async def test_decision_choice_returns_selected_option_and_metadata(client, settings, fake_jev):
+    await _routing_settings(settings)
+    fake_jev.answers = {
+        "decision": {
+            "type": "choice",
+            "choice": "run_test",
+            "probabilities": {"inspect_file": 0.1, "run_test": 0.9},
+            "confidence": 0.9,
+        }
+    }
+    response = await client.post(
+        "/v1/decision",
+        json={"question": "Which action?", "options": ["inspect_file", "run_test"]},
+        headers={"x-api-key": CLIENT_KEY},
+    )
+    body = response.json()
+    assert body["provider"] == "jev"
+    assert body["decision"] == "run_test"
+    assert body["choice"] == "run_test"
+    assert body["confidence"] == 0.9
+    assert body["probabilities"]["run_test"] == 0.9
+    assert body["jev_model"] == "typesafe/jev-1.13"
+    assert body["jev_provider"] == "TypeSafe"
+
+
+async def test_decision_score_returns_rubric_label(client, settings, fake_jev):
+    await _routing_settings(settings)
+    fake_jev.answers = {
+        "decision": {
+            "type": "score",
+            "score": 1.04,
+            "probabilities": {"0": 0.0, "1": 0.96, "2": 0.04},
+            "confidence": 0.94,
+        }
+    }
+    response = await client.post(
+        "/v1/decision",
+        json={
+            "question": "How frustrated?",
+            "options": ["Calm", "Frustrated", "Very angry"],
+            "format": "score",
+        },
+        headers={"x-api-key": CLIENT_KEY},
+    )
+    body = response.json()
+    assert body["provider"] == "jev"
+    assert body["decision"] == "Frustrated"
+    assert body["confidence"] == 0.94
+
+
 async def test_jev_low_confidence_falls_back_to_claude(client, settings, store, fake_jev, fake_claude):
     from jevxagent.server import create_app
     import httpx
 
     await _routing_settings(settings)
-    fake_jev.content = '{"decision": "YES", "confidence": 0.4}'
+    fake_jev.answers = {"decision": {"type": "noul", "noul": 0.4}}
     app = create_app(settings, store=store, claude_client=httpx.AsyncClient(transport=fake_claude, base_url="https://upstream.test"),
                      jev_client=httpx.AsyncClient(transport=fake_jev, base_url="https://upstream.test"))
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as c:
@@ -75,7 +125,7 @@ async def test_jev_malformed_output_falls_back(client, settings, store, fake_jev
     import httpx
 
     await _routing_settings(settings)
-    fake_jev.content = "I think the answer might be yes, probably"
+    fake_jev.body = {"foo": "bar"}  # no "answers" key -> malformed
     app = create_app(settings, store=store, claude_client=httpx.AsyncClient(transport=fake_claude, base_url="https://upstream.test"),
                      jev_client=httpx.AsyncClient(transport=fake_jev, base_url="https://upstream.test"))
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as c:
@@ -177,6 +227,7 @@ async def test_jev_context_is_trimmed(client, settings, fake_jev):
         headers={"x-api-key": CLIENT_KEY},
     )
     sent = jsonlib.loads(fake_jev.seen[0].content.decode())
-    user_content = sent["messages"][1]["content"]
-    assert len(user_content) < 1500
-    assert "[context truncated]" in user_content
+    state = sent["state"]
+    assert len(state) < 1500
+    assert "[context truncated]" in state
+    assert sent["questions"]["decision"]["type"] == "noul"

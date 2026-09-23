@@ -133,6 +133,7 @@ class Settings:
     # routing
     jev_enabled: bool = False
     routing_enabled: bool = False
+    intercept_enabled: bool = False
     jev_routable_types: list[str] = field(default_factory=lambda: _csv(None, DEFAULT_ROUTABLE_TYPES))
 
     # JEV behavior
@@ -181,6 +182,7 @@ class Settings:
             proxy_port=_to_int(env.get("PROXY_PORT"), 8787),
             jev_enabled=_to_bool(env.get("JEV_ENABLED"), False),
             routing_enabled=_to_bool(env.get("ROUTING_ENABLED"), False),
+            intercept_enabled=_to_bool(env.get("INTERCEPT_ENABLED"), False),
             jev_routable_types=_csv(env.get("JEV_ROUTABLE_TYPES"), DEFAULT_ROUTABLE_TYPES),
             jev_timeout_s=_to_float(env.get("JEV_TIMEOUT_S"), 3.0),
             jev_max_retries=_to_int(env.get("JEV_MAX_RETRIES"), 1),

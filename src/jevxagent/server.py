@@ -12,11 +12,12 @@ touches the router. All telemetry recording is deferred to the telemetry layer.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import time
 import uuid
 from contextlib import asynccontextmanager
-from typing import Optional
+from typing import Callable, Optional
 
 import httpx
 from fastapi import FastAPI, Request
@@ -29,6 +30,7 @@ from .logging_setup import get_logger, log_event
 from .providers.base import ProviderError
 from .providers.claude import ClaudeProvider, parse_usage_from_body
 from .providers.jev import JevProvider
+from .router import interceptor
 from .router.classifier import estimate_complexity, infer_decision_type
 from .router.decision import DecisionEvent
 from .router.executor import DecisionExecutor
@@ -47,6 +49,8 @@ def create_app(
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         yield
+        for task in list(app.state.background_tasks):
+            task.cancel()
         await app.state.claude.aclose()
         await app.state.jev.aclose()
         app.state.store.close()
@@ -65,6 +69,13 @@ def create_app(
     app.state.claude = claude
     app.state.jev = jev
     app.state.executor = DecisionExecutor(settings, app.state.store, claude, jev)
+    app.state.background_tasks = set()
+
+    def schedule(coro) -> asyncio.Task:
+        task = asyncio.create_task(coro)
+        app.state.background_tasks.add(task)
+        task.add_done_callback(app.state.background_tasks.discard)
+        return task
 
     @app.get("/healthz")
     async def healthz() -> dict:
@@ -73,6 +84,7 @@ def create_app(
             "version": __version__,
             "jev_enabled": settings.jev_enabled,
             "routing_enabled": settings.routing_enabled,
+            "intercept_enabled": settings.intercept_enabled,
             "jev_configured": jev.is_configured(),
         }
 
@@ -82,7 +94,10 @@ def create_app(
 
     @app.post("/v1/messages")
     async def messages(request: Request) -> Response:
-        return await _handle_messages(request, settings, claude, store=app.state.store)
+        return await _handle_messages(
+            request, settings, claude, store=app.state.store,
+            executor=app.state.executor, schedule=schedule,
+        )
 
     @app.post("/v1/decision")
     async def decision(request: Request) -> JSONResponse:
@@ -96,6 +111,8 @@ async def _handle_messages(
     settings: Settings,
     claude: ClaudeProvider,
     store: TelemetryStore,
+    executor: Optional[DecisionExecutor] = None,
+    schedule: Optional[Callable] = None,
 ) -> Response:
     request_id = request.headers.get("x-request-id") or uuid.uuid4().hex
     start = time.perf_counter()
@@ -155,6 +172,9 @@ async def _handle_messages(
         except ProviderError as exc:
             return await _provider_error(request_id, exc, record, store, start)
 
+        _maybe_intercept(executor, schedule, settings, payload, request_id,
+                         _tool_use_names_from_body(response.body))
+
         record.status = response.status_code
         record.claude_ms = response.latency_ms
         record.total_ms = (time.perf_counter() - start) * 1000.0
@@ -195,6 +215,7 @@ async def _handle_messages(
         )
 
     collector = adapter.SseUsageCollector()
+    tool_collector = adapter.SseToolCollector()
 
     async def relay():
         first_yield = True
@@ -204,11 +225,14 @@ async def _handle_messages(
                     record.claude_ms = (time.perf_counter() - start) * 1000.0
                     first_yield = False
                 collector.on_line(line)
+                tool_collector.on_line(line)
                 yield line + "\n"
         finally:
             _apply_usage(record, collector.usage)
             record.total_ms = (time.perf_counter() - start) * 1000.0
             _finish(record, store, request_id, stream=True, status=record.status)
+            _maybe_intercept(executor, schedule, settings, payload, request_id,
+                             tool_collector.tool_names)
 
     headers = adapter.filter_response_headers(upstream.headers)
     media_type = headers.pop("content-type", "text/event-stream")
@@ -218,6 +242,68 @@ async def _handle_messages(
         media_type=media_type,
         headers=headers,
     )
+
+
+def _intercept_enabled(settings: Settings) -> bool:
+    """Interception only fires when the full routing pipeline is on, so it
+    never produces noise when JEV/routing is disabled."""
+    return bool(settings.intercept_enabled and settings.jev_enabled and settings.routing_enabled)
+
+
+def _tool_use_names_from_body(body: bytes) -> list[str]:
+    try:
+        data = json.loads(body)
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        return []
+    if not isinstance(data, dict):
+        return []
+    return interceptor.extract_tool_use_names(data.get("content"))
+
+
+async def _run_intercept(executor: DecisionExecutor, event: DecisionEvent, request_id: str) -> None:
+    try:
+        result = await executor.execute(event)
+        if result.get("verdict") == "disagree":
+            log_event(
+                logger,
+                "jev_disagreement",
+                request_id=request_id,
+                claude_choice=event.candidate_action,
+                jev_choice=result.get("decision"),
+                confidence=result.get("confidence"),
+            )
+        elif result.get("verdict") == "jev_unavailable":
+            log_event(
+                logger,
+                "jev_unavailable",
+                request_id=request_id,
+                claude_choice=event.candidate_action,
+            )
+    except Exception:  # noqa: BLE001 — coprocessor must never break the proxy
+        logger.exception("intercept decision failed for request %s", request_id)
+
+
+def _maybe_intercept(
+    executor: Optional[DecisionExecutor],
+    schedule: Optional[Callable],
+    settings: Settings,
+    payload: dict,
+    request_id: str,
+    tool_use_names: list[str],
+) -> None:
+    if executor is None or schedule is None:
+        return
+    if not _intercept_enabled(settings):
+        return
+    if not tool_use_names:
+        return
+    context = interceptor.build_intercept_context(payload)
+    event = interceptor.detect_tool_selection(
+        payload, tool_use_names, request_id=request_id, context=context
+    )
+    if event is None:
+        return
+    schedule(_run_intercept(executor, event, request_id))
 
 
 async def _handle_decision(
@@ -250,7 +336,7 @@ async def _handle_decision(
         )
     options = [str(o) for o in options] if options else []
     answer_format = str(body.get("format") or "decision")
-    if answer_format not in {"decision", "choice", "label", "yesno"}:
+    if answer_format not in {"decision", "choice", "label", "yesno", "score", "noul"}:
         answer_format = "decision"
 
     event = DecisionEvent(
