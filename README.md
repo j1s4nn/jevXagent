@@ -1,150 +1,136 @@
 # jevXagent — When JEV Meets LLM Agent
 
-A local **LLM proxy / AI agent middleware** that sits between an LLM agent such
-as **Claude Code** and its primary LLM API (Anthropic-compatible). The primary
-model (Claude) keeps **global context** and does **complex reasoning**; a fast
-auxiliary model (**JEV**) acts as a **decision coprocessor** for suitable
-low-complexity decisions. Built-in **decision routing**, **observability
-(telemetry)**, **statistics dashboard**, and **benchmarking** let you measure
-whether routing actually reduces **latency**, **token usage**, and **cost** for
-agentic workflows.
+**A local LLM proxy / AI-agent middleware that sits between an LLM agent (e.g. Claude Code) and its Anthropic-compatible model API.**
 
-> **Status:** Phase 1 (transparent proxy) **works** and is verified against a
-> real Claude Code session. Decision routing, telemetry and statistics are
-> implemented; **JEV is OFF by default** until a real JEV API key is available.
-> All savings claims are **hypotheses to be measured** — nothing is invented.
+The primary model (Claude) keeps the **global context** and does the **complex reasoning**. A fast auxiliary model (**JEV**) is used as a **decision coprocessor** for suitable low-complexity decisions. Built-in **decision routing**, **telemetry**, a **statistics dashboard**, and **benchmarking** let you measure whether routing actually reduces latency, token usage, and cost for agentic workflows.
+
+![jevXagent social preview](assets/social_preview.png)
+
+> **Status:** Phase 1 (transparent proxy) works and is verified against a real Claude Code session. Routing, interception, verification and the MCP tool are implemented. **JEV routing is OFF by default** until a real JEV API key is configured. Every "savings" number is an **estimate** and clearly labelled — no measured number is ever invented.
 
 ---
 
 ## Table of contents
 
-1. [The problem](#the-problem)
-2. [The core idea](#the-core-idea)
-3. [Architecture](#architecture)
-4. [Current status — what works today](#current-status)
-5. [Quickstart — step-by-step](#quickstart)
-6. [Configuration reference](#configuration)
-7. [JEV integration (when you get a real API key)](#jev-integration)
-8. [Decision routing API](#decision-routing-api)
-9. [Statistics CLI](#statistics-cli)
-10. [Benchmark mode](#benchmark-mode)
-11. [Testing](#testing)
-12. [Security](#security)
-13. [Project structure](#project-structure)
-14. [Roadmap](#roadmap)
-15. [Troubleshooting](#troubleshooting)
-16. [License](#license)
+1. [What is jevXagent?](#what-is-jevxagent)
+2. [The main goal](#the-main-goal)
+3. [What it can do (capability audit)](#what-it-can-do)
+4. [How it works](#how-it-works)
+5. [Quick start: from clone to Claude Code](#quick-start)
+6. [Using it with Claude Code](#using-it-with-claude-code)
+7. [Two modes: relay-only vs routing](#two-modes)
+8. [Configuration reference](#configuration)
+9. [Decision routing API](#decision-routing-api)
+10. [Statistics dashboard](#statistics)
+11. [Benchmark mode](#benchmark)
+12. [MCP tool: `jevx_decide`](#mcp-tool)
+13. [Testing](#testing)
+14. [Security & privacy](#security)
+15. [Project structure](#project-structure)
+16. [Roadmap](#roadmap)
+17. [Troubleshooting](#troubleshooting)
+18. [License](#license)
 
 ---
 
-## The problem
+## What is jevXagent?
 
-An agentic workflow (coding, research, automation) is not one giant reasoning
-operation. It is a long sequence of **many small decisions**:
+An agentic workflow (coding, research, automation) is not one giant reasoning task. It is a long sequence of **many small decisions**:
 
-- What is this object?
-- Which category / option / tool / connector / argument?
+- What is this object? Which category / option / tool / argument?
 - Is this result relevant? Did the tool return what I expected?
-- Should I continue? What should happen next?
-- Does this satisfy the requirement? Is this result valid?
+- Should I continue? What should happen next? Does this satisfy the requirement?
 
-Today every one of those micro-decisions is handled by the primary model —
-the most expensive, most capable model in the pipeline.
+Today, **every** one of those micro-decisions is handled by the primary model — the most expensive, most capable model in the pipeline.
 
-## The core idea
+**jevXagent is a small local server** that you put between your agent and its model API. It:
 
-> **Claude = global context owner and deep reasoner.
-> JEV = high-speed decision coprocessor.
-> jevXagent = middleware that routes each operation to the right model.**
+1. **Relays** every normal request to the upstream model, byte-for-byte (streaming included) — the agent never notices it.
+2. **Optionally routes** the small, structured decisions to a fast auxiliary model (**JEV**), while anything complex or uncertain stays with the primary model.
+3. **Records** everything it sees (latency, API-reported tokens, routes, fallbacks) so you can check the effect with data.
 
 ```
-LLM Agent (e.g. Claude Code)
+LLM Agent (Claude Code)
    |
    v
-jevXagent Proxy -- detect / extract context / decide routing
+jevXagent proxy  -- detect / classify / decide routing
    |
-   +--> JEV      fast, simple decisions (structured YES/NO, choice, label)
+   +--> JEV      fast, simple decisions (structured YES/NO, choice, label, score)
    +--> Claude   complex reasoning, planning, coding, synthesis
 ```
 
-### Research hypothesis (to be tested, not assumed)
+## The main goal
 
-> Agentic LLM workflows contain a large number of low-complexity decision
-> operations that do not necessarily require the primary high-capability
-> model. A fast auxiliary model may handle a substantial subset of them,
-> reducing latency and expensive-model usage while preserving overall task
-> quality.
+**Test — with recorded evidence — whether low-complexity agent decisions can be safely delegated to a fast auxiliary model, reducing latency and expensive-model usage without hurting task quality.**
 
-jevXagent is the instrument used to **test** that hypothesis. The statistics
-layer exists so you can answer — with recorded data — whether routing actually
-made your agent faster or cheaper. Every estimated number is labelled as an
-estimate; every measured number comes from a real recorded call.
+![The main goal of jevXagent](docs/images/why-routing.png)
 
-## Architecture
+The core idea in one line:
 
-```
-                        +------------------------------+
- Claude Code ---------->| jevXagent (FastAPI + httpx) |
-   (Anthropic API)      |                              |
-                        |  /v1/messages  transparent   |--> Claude API
-                        |               relay (SSE)    |
-                        |                              |
-                        |  /v1/decision  router        |--> JEV   (fast decisions)
-                        |               + fallback ----+--> Claude (fallback/baseline)
-                        |                              |
-                        |  telemetry store (SQLite)    |
-                        |  statistics CLI              |
-                        +------------------------------+
-```
+> **Claude = global-context owner and deep reasoner. JEV = high-speed decision coprocessor. jevXagent = the middleware that routes each decision to the right model.**
 
-Design principles (enforced in code):
+**Research hypothesis (to be tested, not assumed):** agentic LLM workflows contain many low-complexity decision operations that do not require the primary model. A fast auxiliary model may handle a substantial subset of them, reducing latency and cost while preserving overall task quality.
 
-1. **The primary model keeps global context.** JEV never receives the full
-   conversation — only a small, trimmed decision context
-   (`src/jevxagent/context/extractor.py`).
-2. **Transport and routing are separated.** `/v1/messages` is a pure relay and
-   never touches the router; routing happens on the dedicated `/v1/decision`
-   surface.
-3. **Fail safely.** JEV uncertain / timeout / malformed output / complex task
-   → **Claude**. Correctness first, latency/cost second.
-4. **The router is cheaper than the task.** Routing decisions use deterministic
-   regex/length heuristics — no model call is made to decide routing.
-5. **No `<think>`-format dependence.** The internal abstraction is the
-   *decision event*, not a particular reasoning format.
+jevXagent is the **instrument** used to test that hypothesis. The statistics layer exists so you can answer, with recorded data, whether routing actually made your agent faster or cheaper.
 
-## Current status
+## What it can do
 
-| Area | Status |
-|---|---|
-| Transparent Anthropic-compatible proxy (`/v1/messages`, SSE streaming) | **Working**, verified with a real Claude Code session |
-| Telemetry: request + decision records (latency, API-reported tokens, fallbacks) | Working |
-| Statistics CLI dashboard, charts, export, report, reset | Working |
-| Decision routing endpoint `/v1/decision` (Claude path live-tested) | Working |
-| JEV provider | Implemented, **disabled** — waiting for a real JEV API |
-| Benchmark mode | Implemented (requires configured providers) |
-| In-conversation interception (MCP tool) | Planned, see [Roadmap](#roadmap) |
-| Kilo Code support | Planned, see [Roadmap](#roadmap) |
+| Capability | Status | What it means for you |
+|---|---|---|
+| **Transparent Anthropic-compatible proxy** (`/v1/messages`, JSON + SSE streaming) | Working | Point Claude Code at the proxy and keep working; requests and streams are relayed unchanged. |
+| **Decision routing** (`/v1/decision`) | Working | Ask a question and get a structured decision. Claude is used as the fallback/baseline. |
+| **Automatic interception** | Working (needs routing on) | When Claude picks a tool, the proxy detects a `tool_selection` decision and asks JEV the same question in the background — non-blocking. |
+| **Verification (JEV vs Claude)** | Working | Every intercepted decision is labelled `agree` / `disagree` / `jev_unavailable` and reported as an agreement rate. |
+| **Telemetry store (SQLite)** | Working | Metadata only by default. Latency, API-reported tokens, routes, fallbacks, errors. |
+| **Statistics dashboard / report / export / reset** | Working | `jevXagent statistics` with time windows, `--report`, `--save`, `--export`, `--reset`. |
+| **Benchmark mode** | Working (needs providers) | Controlled Claude-only vs JEV-routed comparison on a JSONL test set, in a separate DB. |
+| **MCP tool `jevx_decide`** | Working | Let Claude Code ask for a structured decision mid-conversation. |
+| **JEV provider (OpenRouter Decisions API)** | Implemented, **disabled by default** | Answers *typed* questions (`choice` / `noul` / `score`) with calibrated probabilities. |
+| **Kilo Code support** | Planned | The provider/adapter layers were built so another Anthropic-compatible client can be added. |
 
-## Quickstart
+**Design principles enforced in the code:**
 
-Requirements: Python 3.11+, and a Claude Code installation.
+1. **The primary model keeps global context.** JEV never receives the full conversation — only a small, trimmed decision context.
+2. **Transport and routing are separated.** `/v1/messages` is a pure relay and never touches the router.
+3. **Fail safely.** JEV uncertain / timeout / malformed output / complex task → **Claude**. Correctness first.
+4. **The router is cheaper than the task.** Routing uses deterministic regex/length heuristics — no model call is made to decide routing.
+5. **No `<think>`-format dependence.** The internal abstraction is the *decision event*, not a particular reasoning format.
 
-### 1. Get the code
+## How it works
+
+![jevXagent architecture](docs/images/architecture.png)
+
+A single Claude Code turn, split into a transport lane (always on) and a background decision lane:
+
+![Request and decision flow](docs/images/request-flow.png)
+
+Decision routing is deliberately conservative. Any uncertainty falls back to Claude:
+
+![How a decision is routed](docs/images/decision-routing.png)
+
+---
+
+## Quick start
+
+### From clone to Claude Code
+
+![Getting started in five steps](docs/images/getting-started.png)
+
+**Requirements:** Python **3.11+**, Git, and a [Claude Code](https://claude.com/claude-code) installation. A Claude API key (or access to any Anthropic-compatible endpoint) is required for the upstream model.
+
+### Step 1 — Clone the repository
 
 ```bash
 git clone https://github.com/j1s4nn/jevXagent.git
 cd jevXagent
 ```
 
-### 2. Create a virtual environment and install
-
-```bash
-python -m venv .venv
-```
+### Step 2 — Create a virtual environment and install
 
 Windows (PowerShell):
 
 ```powershell
+python -m venv .venv
 .\.venv\Scripts\activate
 python -m pip install -e ".[dev]"
 ```
@@ -152,44 +138,81 @@ python -m pip install -e ".[dev]"
 macOS / Linux:
 
 ```bash
+python -m venv .venv
 source .venv/bin/activate
 pip install -e ".[dev]"
 ```
 
-### 3. Configure secrets
+This installs the `jevXagent` command. Verify it:
+
+```powershell
+jevXagent version
+```
+
+### Step 3 — Configure your secrets
+
+Copy the example file and edit it:
+
+Windows (PowerShell):
 
 ```powershell
 Copy-Item .env.example .env
 ```
 
-Edit `.env`:
+macOS / Linux:
 
-```ini
-CLAUDE_API_KEY=your-claude-api-key
-CLAUDE_BASE_URL=https://your-anthropic-compatible-api.example.com
+```bash
+cp .env.example .env
 ```
 
-`.env` is gitignored — it is **never** committed.
+Open `.env` and set **at minimum** the upstream key and base URL:
 
-### 4. Start the proxy
+```ini
+CLAUDE_API_KEY=your-upstream-api-key
+CLAUDE_BASE_URL=https://api.anthropic.com
+```
+
+- `.env` is **gitignored** — it is never committed. Committed secrets are a real risk; keep them out of Git.
+- `CLAUDE_BASE_URL` can be the official Anthropic API (`https://api.anthropic.com`) or any Anthropic-compatible gateway.
+- Leave `JEV_ENABLED`, `ROUTING_ENABLED`, and `INTERCEPT_ENABLED` as `false` for now. You will turn them on in [Step 7](#step-7--optional-enable-jev-routing).
+
+### Step 4 — Start the proxy
 
 ```powershell
 jevXagent serve
 ```
 
-You should see:
+You should see something like:
 
 ```text
 jevXagent 0.1.0 listening on http://127.0.0.1:8787
-  upstream Claude API : https://your-api.example.com
+  upstream Claude API : https://api.anthropic.com
   JEV enabled         : False
   routing enabled     : False
+  telemetry db        : C:\...\jevXagent\data\telemetry.db
 ```
 
-### 5. Point Claude Code at the proxy
+Leave this terminal running. Open a **second** terminal for the next steps.
 
-Edit `C:\Users\<you>\.claude\settings.json` (macOS/Linux:
-`~/.claude/settings.json`) and change **only** the `env` block:
+### Step 5 — Verify the proxy is alive
+
+```powershell
+curl.exe http://127.0.0.1:8787/healthz
+```
+
+```json
+{"status":"ok","version":"0.1.0","jev_enabled":false,"routing_enabled":false,"intercept_enabled":false,"jev_configured":false}
+```
+
+### Step 6 — Point Claude Code at the proxy
+
+Back up your Claude Code settings first:
+
+```powershell
+Copy-Item $env:USERPROFILE\.claude\settings.json $env:USERPROFILE\.claude\settings.backup.json
+```
+
+Then edit `C:\Users\<you>\.claude\settings.json` (macOS/Linux: `~/.claude/settings.json`) and change **only** the `env` block:
 
 ```json
 "env": {
@@ -199,51 +222,112 @@ Edit `C:\Users\<you>\.claude\settings.json` (macOS/Linux:
 }
 ```
 
-**Make a backup first:**
-
-```powershell
-Copy-Item $env:USERPROFILE\.claude\settings.json $env:USERPROFILE\.claude\settings.backup.json
-```
-
-How authentication works: Claude Code sends `ANTHROPIC_API_KEY` as the
-`x-api-key` header. The proxy **replaces it** with the real `CLAUDE_API_KEY`
-from its `.env` before forwarding upstream. If `CLAUDE_API_KEY` is empty, the
-proxy forwards the client's key unchanged (transparent behavior). If neither
-exists, the proxy returns a 401.
-
-To revert: restore the backup file.
-
-### 6. Verify
-
-```powershell
-curl.exe http://127.0.0.1:8787/healthz
-```
-
 Then just use Claude Code normally:
 
 ```powershell
 claude -p "Reply with exactly: CC_OK"
 ```
 
-If Claude Code answers, the proxy is working.
+If Claude Code answers, the proxy is working end-to-end.
+
+**How authentication works:** Claude Code sends `ANTHROPIC_API_KEY` as the `x-api-key` header. The proxy **replaces it** with the real `CLAUDE_API_KEY` from `.env` before forwarding upstream. If `CLAUDE_API_KEY` is empty, the proxy forwards the client's key unchanged (fully transparent). If neither exists, the proxy returns `401`.
+
+> **Quick test without editing settings.json:** you can also export the two variables in the shell for a single session, then run `claude`:
+>
+> ```powershell
+> $env:ANTHROPIC_BASE_URL="http://127.0.0.1:8787"; $env:ANTHROPIC_API_KEY="jevx-local-proxy"; claude -p "Reply with exactly: CC_OK"
+> ```
+>
+> ```bash
+> ANTHROPIC_BASE_URL=http://127.0.0.1:8787 ANTHROPIC_API_KEY=jevx-local-proxy claude -p "Reply with exactly: CC_OK"
+> ```
+
+### Step 7 — (Optional) Enable JEV routing
+
+You need a JEV key and an OpenRouter Decisions API endpoint. Add these to `.env`:
+
+```env
+JEV_API_KEY=sk-or-v1-...
+JEV_BASE_URL=https://openrouter.ai/api/alpha/decisions
+JEV_MODEL=typesafe/jev-1.13
+
+JEV_ENABLED=true
+ROUTING_ENABLED=true
+INTERCEPT_ENABLED=true
+```
+
+Restart the proxy, then confirm the flags and check connectivity:
+
+```powershell
+curl.exe http://127.0.0.1:8787/healthz    # jev_configured should become true
+python scripts/smoke_jev.py               # real end-to-end decision against JEV
+```
+
+### Step 8 — See the evidence
+
+```powershell
+jevXagent statistics
+```
+
+Every number comes from the telemetry store. See [Statistics dashboard](#statistics).
+
+### Reverting everything
+
+Restore your Claude Code settings backup:
+
+```powershell
+Copy-Item $env:USERPROFILE\.claude\settings.backup.json $env:USERPROFILE\.claude\settings.json
+```
+
+Stop the proxy with `Ctrl+C` in its terminal.
+
+---
+
+## Using it with Claude Code
+
+Once `ANTHROPIC_BASE_URL` points at `http://127.0.0.1:8787`, Claude Code needs no other changes.
+
+- **Relay-only mode (default):** Claude Code works exactly as before; the proxy only observes and records.
+- **Routing mode:** when the response contains a `tool_use` block, the proxy detects a `tool_selection` decision (candidates = the request's declared `tools`) and asks JEV the same question in the background — non-blocking, never touching streaming or the critical path.
+
+Each intercepted decision is tagged with a `verdict`:
+
+- `agree` — JEV chose the same tool as Claude.
+- `disagree` — JEV chose a different tool (logged as `jev_disagreement`).
+- `jev_unavailable` — JEV failed/timeout/low-confidence, so it fell back to Claude.
+
+Verification is **advisory**: the proxy flags and records, it never blocks or rewrites traffic.
+
+**If the upstream rejects a model id** that Claude Code sends, remap it without touching Claude Code:
+
+```ini
+CLAUDE_MODEL_MAP=claude-opus-5-5=claude-sonnet-5
+```
+
+## Two modes
+
+| Mode | Required config | Behaviour |
+|---|---|---|
+| **Relay-only** (safe default) | `CLAUDE_API_KEY`, `CLAUDE_BASE_URL` | Transparent proxy + telemetry. No decisions are routed. |
+| **Routing** | above **+** `JEV_API_KEY`, `JEV_BASE_URL`, `JEV_ENABLED=true`, `ROUTING_ENABLED=true` | Eligible low-complexity decisions go to JEV; everything else to Claude. |
 
 ## Configuration
 
-All configuration is environment-based (`.env` supported). See
-`.env.example` for the full list.
+All configuration is environment-based (`.env` supported). See `.env.example` for the full annotated list.
 
 | Variable | Default | Description |
 |---|---|---|
-| `CLAUDE_API_KEY` | — | Upstream Claude API key (overrides client-sent key) |
+| `CLAUDE_API_KEY` | — | Upstream Claude API key (overrides the client-sent key) |
 | `CLAUDE_BASE_URL` | `https://api-cc.freemodel.dev` | Anthropic-compatible upstream base URL |
 | `CLAUDE_TIMEOUT_S` | `300` | Upstream request timeout |
-| `CLAUDE_MODEL_MAP` | — | Rewrite client-requested model ids to upstream models (`from=to,...`, e.g. `claude-opus-5-5=claude-sonnet-5`) |
-| `JEV_API_KEY` | — | JEV API key (see below) |
+| `CLAUDE_MODEL_MAP` | — | Rewrite client-requested model ids (`from=to,...`) |
+| `JEV_API_KEY` | — | JEV API key (OpenRouter Decisions API) |
 | `JEV_BASE_URL` | — | JEV API base URL |
-| `JEV_MODEL` | `jev` | JEV model id |
+| `JEV_MODEL` | `typesafe/jev-1.13` | JEV model id |
 | `PROXY_HOST` / `PROXY_PORT` | `127.0.0.1` / `8787` | Proxy bind address |
 | `JEV_ENABLED` | `false` | Allow JEV routing |
 | `ROUTING_ENABLED` | `false` | Enable decision routing |
+| `INTERCEPT_ENABLED` | `false` | Detect decision events in `/v1/messages` traffic |
 | `JEV_ROUTABLE_TYPES` | (list) | Decision types allowed to route to JEV |
 | `JEV_TIMEOUT_S` | `3.0` | JEV timeout (fallback to Claude on timeout) |
 | `JEV_MAX_RETRIES` | `1` | JEV retries |
@@ -257,98 +341,25 @@ All configuration is environment-based (`.env` supported). See
 | `CLAUDE_*_PRICE_PER_MTOK` / `JEV_*_PRICE_PER_MTOK` | — | Per-1M-token prices for **estimated** cost |
 | `CLAUDE_EST_*` | — | Configured baseline estimates (used only when no historical data exists) |
 
-## JEV integration
+### Fallback rules
 
-JEV is a **structured decision model** served by OpenRouter via the Decisions
-API. It does not generate text — it answers *typed* questions about a `state`
-and returns calibrated probabilities.
+JEV is used only when **all** of these hold:
 
-Configuration:
+- `JEV_ENABLED=true` and `ROUTING_ENABLED=true`
+- the decision type is in `JEV_ROUTABLE_TYPES`
+- the deterministic complexity score ≤ `JEV_MAX_COMPLEXITY`
 
-```env
-JEV_API_KEY=sk-or-v1-...
-JEV_BASE_URL=https://openrouter.ai/api/alpha/decisions
-JEV_MODEL=typesafe/jev-1.13
-JEV_ENABLED=true
-ROUTING_ENABLED=true
-```
+and the JEV response:
 
-The provider (`src/jevxagent/providers/jev.py`) POSTs to `JEV_BASE_URL` with:
+- parses as a structured Decisions response with typed `answers`
+- has `confidence` ≥ `JEV_CONFIDENCE_THRESHOLD`
+- arrives before `JEV_TIMEOUT_S`
 
-```json
-{
-  "model": "typesafe/jev-1.13",
-  "state": "...",
-  "questions": {
-    "decision": {
-      "type": "choice",
-      "instructions": "...",
-      "criteria": { "option_a": "...", "option_b": "..." }
-    }
-  }
-}
-```
-
-and parses the structured `answers` (types: `choice`, `noul`, `score`), keeping
-probabilities, confidence, model, provider and usage. Verify connectivity:
-
-```powershell
-curl.exe http://127.0.0.1:8787/healthz
-# jev_configured should become true
-
-python scripts/smoke_jev.py   # real end-to-end decision against JEV
-```
-
-### Automatic workflow interception
-
-Beyond the manual endpoint, the proxy can **observe real Claude Code traffic**
-and route eligible decisions to JEV automatically. When Claude's response to
-`/v1/messages` contains a `tool_use` block, the proxy detects a
-`tool_selection` decision event (candidates = the request's declared `tools`)
-and routes it to JEV in the background — non-blocking, never touching
-streaming or the critical path.
-
-```env
-INTERCEPT_ENABLED=true   # requires JEV_ENABLED=true and ROUTING_ENABLED=true
-```
-
-Each detected event is recorded with `source=intercept`, a best-effort
-`conversation_id` (fingerprint of the first user message), and
-`candidate_action` (the tool Claude actually chose), so JEV-vs-Claude agreement
-can later be measured. Only observable agent-interaction boundaries are
-intercepted — never internal tokens, logits, or hidden reasoning.
-
-#### Verification (JEV vs Claude agreement)
-
-Every intercepted decision is also tagged with a `verdict`:
-
-- `agree` — JEV chose the same tool as Claude.
-- `disagree` — JEV chose a different tool (logged as `jev_disagreement`).
-- `jev_unavailable` — JEV failed/timeout/low-confidence, fell back to Claude.
-
-Agreement is reported in `jevXagent statistics` (and `--report` / `--export`)
-as the agreement rate. It is advisory: the proxy flags and records, it never
-blocks or rewrites traffic.
-
-#### MCP `jevx_decide` tool
-
-For decision events that are **not observable** at the `/v1/messages` boundary
-(e.g. file selection, relevance, verification), expose a `jevx_decide` MCP tool
-that Claude Code can call mid-conversation:
-
-```powershell
-# register once
-claude mcp add jevxagent -- python -m jevxagent mcp
-```
-
-The tool accepts `question`, `options`, `context`, `format`, `decision_type`
-and returns the same structured decision as `/v1/decision` (choice / noul /
-score with probabilities), routed through the existing `DecisionExecutor`.
+In **every** other case the decision is handled by Claude. Quality first.
 
 ## Decision routing API
 
-The proxy exposes a dedicated decision endpoint (independent from the main
-conversation — Claude's context is never touched):
+The proxy exposes a dedicated decision endpoint (independent from the main conversation — Claude's context is never touched):
 
 ```http
 POST /v1/decision
@@ -387,34 +398,33 @@ Response:
 }
 ```
 
-### Decision types
+**Decision types:** `classification`, `selection`, `routing`, `verification`, `relevance`, `tool_selection`, `entity_identification`, `simple_comparison`, `simple_extraction`, `simple_transformation`, `next_action`, `binary_decision`, `multiple_choice`, `url_classification`, `other`.
 
-`classification`, `selection`, `routing`, `verification`, `relevance`,
-`tool_selection`, `entity_identification`, `simple_comparison`,
-`simple_extraction`, `simple_transformation`, `next_action`,
-`binary_decision`, `multiple_choice`, `url_classification`, `other`
-(extensible — see `src/jevxagent/telemetry/events.py`).
+### JEV integration details
 
-### Fallback rules
+JEV is a **structured decision model** served by OpenRouter via the Decisions API. It does not generate free text — it answers *typed* questions about a `state` and returns calibrated probabilities. The provider `POST`s:
 
-JEV is used only when **all** of these hold:
+```json
+{
+  "model": "typesafe/jev-1.13",
+  "state": "...",
+  "questions": {
+    "decision": {
+      "type": "choice",
+      "instructions": "...",
+      "criteria": { "option_a": "...", "option_b": "..." }
+    }
+  }
+}
+```
 
-- `JEV_ENABLED=true` and `ROUTING_ENABLED=true`
-- the decision type is in `JEV_ROUTABLE_TYPES`
-- the deterministic complexity score ≤ `JEV_MAX_COMPLEXITY`
+and parses the structured `answers` (types `choice`, `noul`, `score`), keeping probabilities, confidence, model, provider, and usage.
 
-and the JEV response:
-
-- parses as a structured Decisions response with typed `answers`
-- has `confidence` ≥ `JEV_CONFIDENCE_THRESHOLD` (or a calibrated probability
-  for `noul` answers)
-- arrives before `JEV_TIMEOUT_S`
-
-In **every** other case the decision is handled by Claude. Quality first.
-
-## Statistics CLI
+## Statistics
 
 The evidence layer. Every number comes from the telemetry store.
+
+![Measured vs estimated vs unavailable](docs/images/evidence-model.png)
 
 ```powershell
 jevXagent statistics          # dashboard (all time)
@@ -440,31 +450,18 @@ jevXagent statistics --all
 ╚═══════════════════════════════════════════════════════╝
 ```
 
-Options:
-
 | Flag | Effect |
 |---|---|
 | `--report` | Full report including a **measurement methodology** section |
-| `--save [PATH]` | Save charts (SVG) + raw CSV/JSON (default `./stats`, timestamped files) |
+| `--save [PATH]` | Save charts (SVG) + raw CSV/JSON (default `./stats`, timestamped) |
 | `--export csv\|json` | Export the actual recorded events |
 | `--reset` | Delete all telemetry (requires `--yes` when not interactive) |
 
-### Measured vs estimated
+**Measured vs estimated:** measured values come from real provider calls (latency, API-reported tokens, fallbacks, errors). Estimated values (`*`) are projections from historical same-category Claude decisions or configured defaults. Unavailable metrics are shown as `n/a` — nothing is invented.
 
-- **Measured:** provider calls, latency, API-reported tokens, fallbacks, errors.
-- **Estimated:** `Estimated Claude tokens avoided`, `Estimated latency
-  avoided`, `Estimated cost avoided` — computed from historical Claude
-  decisions of the same category, or from configured `CLAUDE_EST_*` / price
-  defaults. Marked with `*` in the dashboard and never presented as
-  measurements.
-- **Unavailable:** shown as `n/a` — nothing is invented. If the API does not
-  report token counts, the dashboard says so.
+## Benchmark
 
-## Benchmark mode
-
-Controlled comparison of **Claude-only** vs **JEV-routed** decisions on a test
-set (JSONL). Benchmark data is stored in a **separate** database
-(`data/benchmark.db`) and is never mixed with production statistics.
+Controlled comparison of **Claude-only** vs **JEV-routed** decisions on a test set (JSONL). Benchmark data is stored in a **separate** database (`data/benchmark.db`) and is never mixed with production statistics.
 
 ```powershell
 jevXagent benchmark --set examples/benchmark_sample.jsonl
@@ -472,8 +469,17 @@ jevXagent benchmark --mode claude-only
 jevXagent benchmark --mode jev-routed
 ```
 
-It reports per-item latency, route, and agreement between the Claude baseline
-and the routed decision (or against an `expected` field when provided).
+It reports per-item latency, route, and agreement between the Claude baseline and the routed decision (or against an `expected` field when provided).
+
+## MCP tool
+
+For decisions that are **not observable** at the `/v1/messages` boundary (e.g. file selection, relevance, verification), register the `jevx_decide` MCP tool so Claude Code can ask mid-conversation:
+
+```powershell
+claude mcp add jevxagent -- python -m jevxagent mcp
+```
+
+The tool accepts `question`, `options`, `context`, `format`, `decision_type` and returns the same structured decision as `/v1/decision`, routed through the existing `DecisionExecutor`.
 
 ## Testing
 
@@ -481,19 +487,21 @@ and the routed decision (or against an `expected` field when provided).
 .\.venv\Scripts\python.exe -m pytest -q
 ```
 
-The test suite uses in-memory fake upstreams — **no network calls and no API
-keys are used**. It covers the transparent relay (JSON + SSE), header/auth
-behavior, error relay, JEV routing and every fallback path, telemetry
-aggregation, and the CLI.
+The suite uses in-memory fake upstreams — **no network calls and no API keys are used**. It currently contains **128 tests** covering the transparent relay (JSON + SSE), header/auth behaviour, error relay, JEV routing and every fallback path, interception, verification, telemetry aggregation, the MCP server, and the CLI.
+
+### Regenerating the README figures
+
+```powershell
+.\.venv\Scripts\python.exe scripts\generate_readme_figures.py
+```
+
+Outputs to `docs/images/`. Requires `matplotlib` (installed with the `dev` extra).
 
 ## Security
 
 - API keys live in `.env` (gitignored) — never committed, never logged.
-- Structured logs redact every secret-like field (`x-api-key`,
-  `authorization`, …); token-count fields are not treated as secrets.
-- Telemetry stores metadata only. Full prompts/responses are not stored unless
-  explicitly enabled via `STORE_PROMPTS` / `STORE_RESPONSES` /
-  `STORE_DECISION_CONTEXT`.
+- Structured logs redact every secret-like field (`x-api-key`, `authorization`, …); token-count fields are not treated as secrets.
+- Telemetry stores metadata only. Full prompts/responses are not stored unless explicitly enabled via `STORE_PROMPTS` / `STORE_RESPONSES` / `STORE_DECISION_CONTEXT`.
 - The proxy binds to `127.0.0.1` by default.
 
 ## Project structure
@@ -505,6 +513,7 @@ jevXagent/
 │   ├── config.py            # env-based configuration, secret redaction
 │   ├── logging_setup.py     # structured JSON logging
 │   ├── __main__.py          # CLI entry point
+│   ├── mcp_server.py        # jevx_decide MCP tool (stdio)
 │   ├── adapters/
 │   │   └── anthropic.py     # Anthropic protocol knowledge (more adapters can be added)
 │   ├── providers/
@@ -514,7 +523,9 @@ jevXagent/
 │   │   ├── decision.py      # DecisionEvent abstraction
 │   │   ├── classifier.py    # deterministic type + complexity inference
 │   │   ├── policy.py        # conservative routing policy
-│   │   └── executor.py      # JEV/Claude execution with fallback
+│   │   ├── executor.py      # JEV/Claude execution with fallback
+│   │   ├── interceptor.py   # detects observable tool_selection events
+│   │   └── verification.py  # JEV-vs-Claude agreement verdict
 │   ├── context/
 │   │   └── extractor.py     # small-context extraction for JEV
 │   ├── telemetry/
@@ -526,27 +537,26 @@ jevXagent/
 │   └── cli/
 │       ├── statistics.py    # jevXagent statistics
 │       └── benchmark.py     # jevXagent benchmark
-├── tests/                   # 80+ tests, no network
+├── tests/                   # 128 tests, no network
+├── docs/
+│   ├── architecture.md
+│   ├── PHASE_LOG.md
+│   └── images/              # README figures
+├── scripts/
+│   ├── smoke_jev.py             # real end-to-end JEV smoke test
+│   ├── generate_readme_figures.py
+│   └── generate_social_preview.py
 ├── examples/benchmark_sample.jsonl
-├── docs/architecture.md
-├── docs/PHASE_LOG.md
 ├── .env.example             # placeholders only
 └── pyproject.toml
 ```
 
 ## Roadmap
 
-1. **Real JEV API** — fill in `JEV_API_KEY` / `JEV_BASE_URL`, verify the
-   protocol in `providers/jev.py`, enable routing, and run the decision tests
-   live.
-2. **In-conversation interception** — expose a `jevx_decide` tool via a small
-   MCP server plugin so an agent can call JEV decisions mid-conversation
-   through `/v1/decision` (the current safe integration point).
-3. **Kilo Code support** — inspect Kilo Code's provider/base-URL configuration
-   and, if it supports a custom Anthropic-compatible base URL, point it at
-   `http://127.0.0.1:8787`. The provider/adapter layers were built for this.
-4. **Benchmark evidence** — run the controlled benchmark and answer, with
-   data: *how many decision operations can safely be delegated to JEV?*
+1. **Real JEV evidence** — run benchmarks and answer, with data: *how many decision operations can safely be delegated to JEV?*
+2. **Acting on disagreements** — surface a warning or a "trust JEV over Claude for tool X" override (currently recorded/logged only).
+3. **Kilo Code support** — point another Anthropic-compatible client at `http://127.0.0.1:8787`. The provider/adapter layers were built for this.
+4. **More adapters** — e.g. an OpenAI-compatible adapter beside `adapters/anthropic.py`.
 
 ## Troubleshooting
 
@@ -555,7 +565,8 @@ jevXagent/
 | `claude` fails to start / connection refused | Proxy not running — start with `jevXagent serve` |
 | 401 from the proxy | `CLAUDE_API_KEY` empty in `.env` **and** no `x-api-key` sent |
 | 502 from the proxy | Upstream unreachable — check `CLAUDE_BASE_URL` |
-| `JEV is not configured` in benchmark | Set `JEV_API_KEY` + `JEV_BASE_URL` in `.env` |
+| Upstream rejects a model id | Set `CLAUDE_MODEL_MAP=client_model=upstream_model` |
+| `JEV is not configured` in benchmark | Set `JEV_API_KEY` + `JEV_BASE_URL` in `.env`, or use `--mode claude-only` |
 | Statistics empty | No traffic through the proxy yet — data is recorded per request |
 | Box-drawing characters look wrong | Use Windows Terminal; the CLI forces UTF-8 output |
 | Revert everything | Restore `settings.backup.json` over `settings.json` |
