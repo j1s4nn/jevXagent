@@ -1,0 +1,42 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "jevxagent"
+version = "0.1.0"
+description = "When JEV Meets LLM Agent — a local LLM proxy that routes low-complexity agent decisions to a fast auxiliary model (JEV) while the primary model (Claude) keeps global context and handles complex reasoning."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "j1s4nn", email = "myprojectjisan@gmail.com" }]
+keywords = ["llm", "proxy", "anthropic", "claude-code", "claude", "routing", "agents", "middleware", "llm-agent", "decision-routing", "telemetry"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Topic :: Software Development :: Libraries",
+]
+dependencies = [
+    "fastapi>=0.110",
+    "uvicorn>=0.29",
+    "httpx>=0.27",
+    "python-dotenv>=1.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8",
+    "pytest-asyncio>=0.23",
+]
+
+[project.scripts]
+jevXagent = "jevxagent.__main__:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
