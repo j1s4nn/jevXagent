@@ -237,6 +237,7 @@ All configuration is environment-based (`.env` supported). See
 | `CLAUDE_API_KEY` | — | Upstream Claude API key (overrides client-sent key) |
 | `CLAUDE_BASE_URL` | `https://api-cc.freemodel.dev` | Anthropic-compatible upstream base URL |
 | `CLAUDE_TIMEOUT_S` | `300` | Upstream request timeout |
+| `CLAUDE_MODEL_MAP` | — | Rewrite client-requested model ids to upstream models (`from=to,...`, e.g. `claude-opus-5-5=claude-sonnet-5`) |
 | `JEV_API_KEY` | — | JEV API key (see below) |
 | `JEV_BASE_URL` | — | JEV API base URL |
 | `JEV_MODEL` | `jev` | JEV model id |

@@ -61,6 +61,51 @@ async def test_missing_key_raises():
         provider.build_headers(None)
 
 
+async def test_post_rewrites_model_via_map():
+    seen = []
+
+    def responder(request):
+        return httpx.Response(200, json={"type": "message", "usage": {}})
+
+    settings = Settings(
+        claude_api_key="k",
+        claude_base_url="https://upstream.test",
+        claude_model_map={"claude-opus-5-5": "claude-sonnet-5"},
+    )
+    provider = ClaudeProvider(settings, client=_client(seen, responder))
+    await provider.post({"model": "claude-opus-5-5", "max_tokens": 5, "messages": []})
+    assert json.loads(seen[0].content)["model"] == "claude-sonnet-5"
+
+
+async def test_stream_rewrites_model_via_map():
+    seen = []
+
+    def responder(request):
+        return httpx.Response(200, content=b"", headers={"content-type": "text/event-stream"})
+
+    settings = Settings(
+        claude_api_key="k",
+        claude_base_url="https://upstream.test",
+        claude_model_map={"claude-opus-5-5": "claude-sonnet-5"},
+    )
+    provider = ClaudeProvider(settings, client=_client(seen, responder))
+    result = await provider.stream({"model": "claude-opus-5-5", "max_tokens": 5, "stream": True, "messages": []})
+    async for _ in result.lines:
+        pass
+    assert json.loads(seen[0].content)["model"] == "claude-sonnet-5"
+
+
+async def test_post_no_model_map_is_transparent():
+    seen = []
+
+    def responder(request):
+        return httpx.Response(200, json={"type": "message", "usage": {}})
+
+    provider = ClaudeProvider(make_settings(), client=_client(seen, responder))
+    await provider.post({"model": "claude-opus-5-5", "max_tokens": 5, "messages": []})
+    assert json.loads(seen[0].content)["model"] == "claude-opus-5-5"
+
+
 async def test_stream_lines():
     seen = []
     body = "event: ping\ndata: {\"type\":\"ping\"}\n\n"

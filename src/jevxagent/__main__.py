@@ -1,5 +1,6 @@
 """CLI entry point.
 
+    jevXagent             start the local proxy (default)
     jevXagent serve       start the local proxy
     jevXagent statistics  statistics dashboard (alias: stats)
     jevXagent benchmark   controlled Claude-only vs JEV-routed comparison
@@ -49,7 +50,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "version":
         print(f"jevXagent {__version__}")
         return 0
-    if args.command == "serve":
+    if args.command in (None, "serve"):
         return _serve(args)
 
     parser.print_help()
@@ -62,13 +63,13 @@ def _serve(args: argparse.Namespace) -> int:
     from .server import create_app
 
     settings = Settings.from_env()
-    setup_logging(args.log_level or settings.log_level)
+    setup_logging(getattr(args, "log_level", None) or settings.log_level)
     app = create_app(settings)
 
     import uvicorn
 
-    host = args.host or settings.proxy_host
-    port = args.port or settings.proxy_port
+    host = getattr(args, "host", None) or settings.proxy_host
+    port = getattr(args, "port", None) or settings.proxy_port
     print(f"jevXagent {__version__} listening on http://{host}:{port}")
     print(f"  upstream Claude API : {settings.claude_base_url}")
     print(f"  JEV enabled         : {settings.jev_enabled}")

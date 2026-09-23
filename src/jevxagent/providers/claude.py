@@ -42,6 +42,15 @@ class ClaudeProvider:
         if self._owns_client:
             await self._client.aclose()
 
+    def _remapped(self, payload: dict) -> dict:
+        model = payload.get("model")
+        mapped = self._settings.remap_model(str(model)) if model else None
+        if not model or mapped == model:
+            return payload
+        new_payload = dict(payload)
+        new_payload["model"] = mapped
+        return new_payload
+
     def build_headers(self, client_key: str | None) -> dict[str, str]:
         """Upstream headers. CLAUDE_API_KEY from config always wins when set,
         otherwise the client's key is forwarded (transparent behavior).
@@ -74,6 +83,7 @@ class ClaudeProvider:
     async def post(
         self, payload: dict, client_key: str | None = None, extra_headers: dict | None = None
     ) -> NonStreamResponse:
+        payload = self._remapped(payload)
         headers = self.build_headers(client_key)
         if extra_headers:
             headers.update(extra_headers)
@@ -97,6 +107,7 @@ class ClaudeProvider:
     async def stream(
         self, payload: dict, client_key: str | None = None, extra_headers: dict | None = None
     ) -> StreamResponse:
+        payload = self._remapped(payload)
         headers = self.build_headers(client_key)
         if extra_headers:
             headers.update(extra_headers)

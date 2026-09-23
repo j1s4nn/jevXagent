@@ -97,12 +97,29 @@ def _csv(value, default: str) -> list[str]:
     return [item.strip() for item in str(raw).split(",") if item.strip()]
 
 
+def _parse_model_map(value) -> dict[str, str]:
+    """Parse CLAUDE_MODEL_MAP="from=to,from2=to2" into a lookup dict."""
+    result: dict[str, str] = {}
+    if not value:
+        return result
+    for item in str(value).split(","):
+        item = item.strip()
+        if not item or "=" not in item:
+            continue
+        src, _, dst = item.partition("=")
+        src, dst = src.strip(), dst.strip()
+        if src and dst:
+            result[src] = dst
+    return result
+
+
 @dataclass
 class Settings:
     # Claude (primary provider)
     claude_api_key: str = ""
     claude_base_url: str = "https://api-cc.freemodel.dev"
     claude_timeout_s: float = 300.0
+    claude_model_map: dict[str, str] = field(default_factory=dict)
 
     # JEV (decision coprocessor)
     jev_api_key: str = ""
@@ -156,6 +173,7 @@ class Settings:
             claude_api_key=env.get("CLAUDE_API_KEY", "").strip(),
             claude_base_url=env.get("CLAUDE_BASE_URL", "https://api-cc.freemodel.dev").strip().rstrip("/"),
             claude_timeout_s=_to_float(env.get("CLAUDE_TIMEOUT_S"), 300.0),
+            claude_model_map=_parse_model_map(env.get("CLAUDE_MODEL_MAP")),
             jev_api_key=env.get("JEV_API_KEY", "").strip(),
             jev_base_url=env.get("JEV_BASE_URL", "").strip().rstrip("/"),
             jev_model=env.get("JEV_MODEL", "").strip(),
@@ -187,6 +205,10 @@ class Settings:
                 env.get("CLAUDE_EST_OUTPUT_TOKENS_PER_DECISION"), 0.0
             ),
         )
+
+    def remap_model(self, model: str) -> str:
+        """Map a client-requested model id to an upstream-supported id."""
+        return self.claude_model_map.get(model, model)
 
     def ensure_data_dir(self) -> Path:
         self.data_dir.mkdir(parents=True, exist_ok=True)

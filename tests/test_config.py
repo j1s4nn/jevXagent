@@ -90,3 +90,17 @@ def test_token_fields_are_not_redacted():
 def test_db_path_created(settings):
     settings.ensure_data_dir()
     assert settings.db_path().parent.exists()
+
+
+def test_model_map_parsing_and_remap():
+    from jevxagent.config import _parse_model_map
+
+    assert _parse_model_map("") == {}
+    assert _parse_model_map("a=b,c=d") == {"a": "b", "c": "d"}
+    assert _parse_model_map(" claude-opus-5-5 = claude-sonnet-5 ") == {"claude-opus-5-5": "claude-sonnet-5"}
+    assert _parse_model_map("bad") == {}
+    assert _parse_model_map("a=b,noequals") == {"a": "b"}
+
+    settings = Settings(claude_model_map={"claude-opus-5-5": "claude-sonnet-5"})
+    assert settings.remap_model("claude-opus-5-5") == "claude-sonnet-5"
+    assert settings.remap_model("claude-sonnet-5") == "claude-sonnet-5"
