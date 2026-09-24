@@ -2,7 +2,7 @@
 import json
 from pathlib import Path
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, timezone
 
 from .models import ProxyMetrics
 
@@ -21,7 +21,7 @@ class StatsStorage:
             return
 
         record = {
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "trace_id": metric.trace_id,
             "jev_enabled": metric.jev_enabled,
             "jev_status": metric.jev_status,
