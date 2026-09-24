@@ -37,7 +37,7 @@ Feature requests are welcome! Please include:
 ```bash
 # Clone your fork
 git clone https://github.com/YOUR_USERNAME/jevXagent-v0.2.git
-cd jevXagent-v0.2
+cd jevXagent
 
 # Install in development mode
 pip install -e ".[dev]"

@@ -97,7 +97,7 @@ User → Jev (120ms) → Line J → Agent → [generate only] → Response
 ```bash
 # Clone and install
 git clone https://github.com/j1s4nn/jevXagent.git
-cd jevXagent-v0.2
+cd jevXagent
 pip install -e .
 ```
 

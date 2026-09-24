@@ -7,7 +7,7 @@
 ```bash
 # Clone the repository
 git clone https://github.com/j1s4nn/jevXagent.git
-cd jevXagent-v0.2
+cd jevXagent
 
 # Install the package
 pip install -e .
@@ -40,7 +40,7 @@ Configuration is saved to `~/.jevxagent/config.json`
 ### Terminal 1: Start the Proxy
 
 ```bash
-cd jevXagent-v0.2
+cd jevXagent
 python -m jevxagent
 ```
 
