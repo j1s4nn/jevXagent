@@ -96,7 +96,7 @@ User → Jev (120ms) → Line J → Agent → [generate only] → Response
 
 ```bash
 # Clone and install
-git clone https://github.com/j1s4nn/jevXagent-v0.2.git
+git clone https://github.com/j1s4nn/jevXagent.git
 cd jevXagent-v0.2
 pip install -e .
 ```
@@ -387,8 +387,8 @@ MIT License - see [LICENSE](LICENSE) for details.
 
 ## Support
 
-- **Issues:** [GitHub Issues](https://github.com/j1s4nn/jevXagent-v0.2/issues)
-- **Discussions:** [GitHub Discussions](https://github.com/j1s4nn/jevXagent-v0.2/discussions)
+- **Issues:** [GitHub Issues](https://github.com/j1s4nn/jevXagent/issues)
+- **Discussions:** [GitHub Discussions](https://github.com/j1s4nn/jevXagent/discussions)
 - **Email:** myprojectjisan@gmail.com
 
 ---

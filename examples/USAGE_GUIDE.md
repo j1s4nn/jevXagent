@@ -6,7 +6,7 @@
 
 ```bash
 # Clone the repository
-git clone https://github.com/j1s4nn/jevXagent-v0.2.git
+git clone https://github.com/j1s4nn/jevXagent.git
 cd jevXagent-v0.2
 
 # Install the package

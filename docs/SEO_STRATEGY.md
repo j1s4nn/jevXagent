@@ -56,7 +56,7 @@ jevXagent solves these problems through intelligent request routing and context 
 
 ## Technical SEO
 
-Repository: https://github.com/j1s4nn/jevXagent-v0.2
+Repository: https://github.com/j1s4nn/jevXagent
 Primary: jevXagent
 Alternative: jev-x-agent, jev agent proxy, ai agent optimizer
 Category: Developer Tools, AI Infrastructure, LLM Optimization

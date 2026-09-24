@@ -1,92 +1,91 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 400">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 500">
   <defs>
     <style>
-      .title { font: bold 20px sans-serif; fill: #1a1a1a; }
-      .subtitle { font: 14px sans-serif; fill: #666; }
+      .title { font: bold 22px 'Segoe UI', Arial, sans-serif; fill: #1a1a1a; }
+      .subtitle { font: 16px 'Segoe UI', Arial, sans-serif; fill: #666; }
+      .label { font: 14px 'Segoe UI', Arial, sans-serif; fill: #333; }
+      .label-small { font: 12px 'Segoe UI', Arial, sans-serif; fill: #555; font-style: italic; }
+      .metric-bad { font: bold 16px 'Segoe UI', Arial, sans-serif; fill: #dc3545; }
+      .metric-good { font: bold 16px 'Segoe UI', Arial, sans-serif; fill: #28a745; }
       .box { fill: #f8f9fa; stroke: #dee2e6; stroke-width: 2; }
-      .slow-box { fill: #ffe6e6; stroke: #dc3545; stroke-width: 2; }
-      .fast-box { fill: #d4edda; stroke: #28a745; stroke-width: 2; }
-      .label { font: 13px sans-serif; fill: #333; }
-      .metric { font: bold 14px sans-serif; }
-      .metric-bad { font: bold 14px sans-serif; fill: #dc3545; }
-      .metric-good { font: bold 14px sans-serif; fill: #28a745; }
+      .slow-box { fill: #fff5f5; stroke: #fc8181; stroke-width: 2.5; }
+      .fast-box { fill: #f0fff4; stroke: #68d391; stroke-width: 2.5; }
+      .process-box { fill: white; stroke: #cbd5e0; stroke-width: 2; }
     </style>
     <marker id="arrow-red" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
-      <polygon points="0 0, 10 3, 0 6" fill="#dc3545"/>
+      <polygon points="0 0, 10 3, 0 6" fill="#fc8181"/>
     </marker>
     <marker id="arrow-green" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
-      <polygon points="0 0, 10 3, 0 6" fill="#28a745"/>
+      <polygon points="0 0, 10 3, 0 6" fill="#68d391"/>
     </marker>
-    <marker id="arrow-yellow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
-      <polygon points="0 0, 10 3, 0 6" fill="#ffc107"/>
+    <marker id="arrow-yellow" markerWidth="12" markerHeight="12" refX="10" refY="3" orient="auto">
+      <polygon points="0 0, 12 3, 0 6" fill="#f59e0b"/>
     </marker>
   </defs>
 
-  <!-- Left Side: Traditional Agent (Slow) -->
-  <text x="250" y="30" text-anchor="middle" class="title">Without jevXagent</text>
-  <text x="250" y="50" text-anchor="middle" class="metric-bad">2,400ms - 240 tokens</text>
-
-  <!-- User prompt -->
-  <rect x="150" y="70" width="200" height="40" class="box" rx="5"/>
-  <text x="250" y="95" text-anchor="middle" class="label">"restart the pod"</text>
-
-  <!-- Arrow -->
-  <path d="M 250 110 L 250 140" stroke="#dc3545" stroke-width="2" fill="none" marker-end="url(#arrow-red)"/>
-
-  <!-- Agent processing -->
-  <rect x="120" y="140" width="260" height="180" class="slow-box" rx="5"/>
-  <text x="250" y="165" text-anchor="middle" class="label">Agent LLM Processing</text>
-  <text x="250" y="190" text-anchor="middle" class="label" style="font-style: italic;">1. "Let me classify this..."</text>
-  <text x="250" y="210" text-anchor="middle" class="label" style="font-style: italic;">2. "This is DevOps related..."</text>
-  <text x="250" y="230" text-anchor="middle" class="label" style="font-style: italic;">3. "Kubernetes command..."</text>
-  <text x="250" y="250" text-anchor="middle" class="label" style="font-style: italic;">4. "Best practices check..."</text>
-  <text x="250" y="270" text-anchor="middle" class="label" style="font-style: italic;">5. "Generate explanation..."</text>
-  <text x="250" y="290" text-anchor="middle" class="label" style="font-style: italic;">6. "Write code..."</text>
-  <text x="250" y="310" text-anchor="middle" class="metric-bad">2,400ms</text>
-
-  <!-- Arrow -->
-  <path d="M 250 320 L 250 345" stroke="#dc3545" stroke-width="2" fill="none" marker-end="url(#arrow-red)"/>
-
-  <!-- Response -->
-  <rect x="130" y="345" width="240" height="35" class="slow-box" rx="5"/>
-  <text x="250" y="368" text-anchor="middle" class="label">Long explanation + code</text>
+  <!-- Header -->
+  <text x="600" y="35" text-anchor="middle" class="title">Performance Comparison</text>
+  <text x="600" y="60" text-anchor="middle" class="subtitle">Same Request - Different Architectures</text>
 
   <!-- Divider -->
-  <line x1="500" y1="20" x2="500" y2="390" stroke="#dee2e6" stroke-width="3"/>
+  <line x1="600" y1="90" x2="600" y2="480" stroke="#e2e8f0" stroke-width="3"/>
 
-  <!-- Right Side: With jevXagent (Fast) -->
-  <text x="750" y="30" text-anchor="middle" class="title">With jevXagent</text>
-  <text x="750" y="50" text-anchor="middle" class="metric-good">890ms - 48 tokens</text>
+  <!-- LEFT: Without jevXagent -->
+  <text x="300" y="110" text-anchor="middle" class="title" fill="#dc3545">Without jevXagent</text>
+  <text x="300" y="135" text-anchor="middle" class="metric-bad">2,400ms • 240 tokens</text>
 
-  <!-- User prompt -->
-  <rect x="650" y="70" width="200" height="40" class="box" rx="5"/>
-  <text x="750" y="95" text-anchor="middle" class="label">"restart the pod"</text>
+  <!-- User Input -->
+  <rect x="200" y="160" width="200" height="50" class="box" rx="8"/>
+  <text x="300" y="190" text-anchor="middle" class="label">User: "restart the pod"</text>
 
-  <!-- Arrow to Jev -->
-  <path d="M 750 110 L 750 140" stroke="#28a745" stroke-width="2" fill="none" marker-end="url(#arrow-green)"/>
+  <path d="M 300 210 L 300 240" stroke="#fc8181" stroke-width="3" marker-end="url(#arrow-red)"/>
 
-  <!-- Jev processing -->
-  <rect x="650" y="140" width="200" height="60" class="fast-box" rx="5"/>
-  <text x="750" y="165" text-anchor="middle" class="label">Jev Decision</text>
-  <text x="750" y="185" text-anchor="middle" class="label">"DevOps, kubectl, urgent"</text>
-  <text x="750" y="195" text-anchor="middle" class="metric-good">120ms</text>
+  <!-- Agent Processing (Slow) -->
+  <rect x="150" y="240" width="300" height="180" class="slow-box" rx="8"/>
+  <text x="300" y="265" text-anchor="middle" class="label" font-weight="bold">Agent LLM (All Processing)</text>
+  <text x="300" y="295" text-anchor="middle" class="label-small">1. Classify request type</text>
+  <text x="300" y="315" text-anchor="middle" class="label-small">2. Determine context</text>
+  <text x="300" y="335" text-anchor="middle" class="label-small">3. Plan response</text>
+  <text x="300" y="355" text-anchor="middle" class="label-small">4. Generate explanation</text>
+  <text x="300" y="375" text-anchor="middle" class="label-small">5. Write code</text>
+  <text x="300" y="400" text-anchor="middle" class="metric-bad">⏱ 2,400ms</text>
 
-  <!-- Arrow: Line J -->
-  <path d="M 750 200 L 750 230" stroke="#ffc107" stroke-width="4" fill="none" marker-end="url(#arrow-yellow)"/>
-  <rect x="705" y="210" width="90" height="25" fill="#ffc107" rx="3"/>
-  <text x="750" y="228" text-anchor="middle" style="font: bold 14px sans-serif; fill: white;">Line J Inject</text>
+  <path d="M 300 420 L 300 450" stroke="#fc8181" stroke-width="3" marker-end="url(#arrow-red)"/>
 
-  <!-- Agent generation only -->
-  <rect x="650" y="230" width="200" height="80" class="fast-box" rx="5"/>
-  <text x="750" y="255" text-anchor="middle" class="label">Agent Generation</text>
-  <text x="750" y="275" text-anchor="middle" class="label" style="font-style: italic;">*Sees decisions*</text>
-  <text x="750" y="295" text-anchor="middle" class="label" style="font-style: italic;">"kubectl rollout restart..."</text>
-  <text x="750" y="305" text-anchor="middle" class="metric-good">770ms</text>
+  <!-- Result (Slow) -->
+  <rect x="180" y="450" width="240" height="30" class="slow-box" rx="6"/>
+  <text x="300" y="470" text-anchor="middle" class="label">Long response + explanation</text>
 
-  <!-- Arrow -->
-  <path d="M 750 310 L 750 345" stroke="#28a745" stroke-width="2" fill="none" marker-end="url(#arrow-green)"/>
+  <!-- RIGHT: With jevXagent -->
+  <text x="900" y="110" text-anchor="middle" class="title" fill="#28a745">With jevXagent</text>
+  <text x="900" y="135" text-anchor="middle" class="metric-good">890ms • 48 tokens</text>
 
-  <!-- Response -->
-  <rect x="680" y="345" width="140" height="35" class="fast-box" rx="5"/>
-  <text x="750" y="368" text-anchor="middle" class="label">Concise code only</text>
+  <!-- User Input -->
+  <rect x="800" y="160" width="200" height="50" class="box" rx="8"/>
+  <text x="900" y="190" text-anchor="middle" class="label">User: "restart the pod"</text>
+
+  <path d="M 900 210 L 900 240" stroke="#68d391" stroke-width="3" marker-end="url(#arrow-green)"/>
+
+  <!-- Jev Fast Decision -->
+  <rect x="760" y="240" width="280" height="70" class="fast-box" rx="8"/>
+  <text x="900" y="265" text-anchor="middle" class="label" font-weight="bold">Jev Decision Engine</text>
+  <text x="900" y="290" text-anchor="middle" class="label-small">DevOps • kubectl • urgent</text>
+  <text x="900" y="305" text-anchor="middle" class="metric-good">⚡ 120ms</text>
+
+  <!-- Line J Arrow -->
+  <path d="M 900 310 L 900 340" stroke="#f59e0b" stroke-width="5" marker-end="url(#arrow-yellow)"/>
+  <rect x="850" y="320" width="100" height="28" fill="#f59e0b" rx="6"/>
+  <text x="900" y="339" text-anchor="middle" style="font: bold 14px 'Segoe UI'; fill: white;">Line J</text>
+
+  <!-- Agent Generation (Fast) -->
+  <rect x="760" y="340" width="280" height="80" class="fast-box" rx="8"/>
+  <text x="900" y="365" text-anchor="middle" class="label" font-weight="bold">Agent LLM (Generation Only)</text>
+  <text x="900" y="390" text-anchor="middle" class="label-small">Context already provided</text>
+  <text x="900" y="410" text-anchor="middle" class="metric-good">⚡ 770ms</text>
+
+  <path d="M 900 420 L 900 450" stroke="#68d391" stroke-width="3" marker-end="url(#arrow-green)"/>
+
+  <!-- Result (Fast) -->
+  <rect x="810" y="450" width="180" height="30" class="fast-box" rx="6"/>
+  <text x="900" y="470" text-anchor="middle" class="label">Concise code only</text>
 </svg>

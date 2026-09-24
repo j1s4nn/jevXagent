@@ -21,7 +21,7 @@ Transparent proxy that makes AI coding agents 3× faster and 80% cheaper. Cut re
 
 2. **Website URL**:
 ```
-https://github.com/j1s4nn/jevXagent-v0.2
+https://github.com/j1s4nn/jevXagent
 ```
 
 3. **Topics** (add these tags):
@@ -77,7 +77,7 @@ git push origin main
 
 ## Step 3: Create GitHub Release
 
-1. Go to: https://github.com/j1s4nn/jevXagent-v0.2/releases
+1. Go to: https://github.com/j1s4nn/jevXagent/releases
 2. Click "Create a new release"
 3. Tag version: `v0.2.0`
 4. Release title: `jevXagent v0.2.0 - Make AI Agents 3× Faster`
@@ -106,7 +106,7 @@ git push origin main
 ### Installation
 
 ```bash
-pip install -e git+https://github.com/j1s4nn/jevXagent-v0.2.git#egg=jevxagent
+pip install -e git+https://github.com/j1s4nn/jevXagent.git#egg=jevxagent
 ```
 
 ### Quick Start
@@ -116,7 +116,7 @@ python -m jevxagent
 # Follow interactive setup
 ```
 
-See [README](https://github.com/j1s4nn/jevXagent-v0.2#readme) for complete documentation.
+See [README](https://github.com/j1s4nn/jevXagent#readme) for complete documentation.
 
 ### What's New
 
@@ -137,14 +137,14 @@ See [README](https://github.com/j1s4nn/jevXagent-v0.2#readme) for complete docum
 
 ### Links
 
-- [Documentation](https://github.com/j1s4nn/jevXagent-v0.2/tree/main/examples)
-- [Quick Start Guide](https://github.com/j1s4nn/jevXagent-v0.2/blob/main/QUICKSTART.md)
-- [Implementation Report](https://github.com/j1s4nn/jevXagent-v0.2/blob/main/IMPLEMENTATION_REPORT.md)
-- [Contributing](https://github.com/j1s4nn/jevXagent-v0.2/blob/main/CONTRIBUTING.md)
+- [Documentation](https://github.com/j1s4nn/jevXagent/tree/main/examples)
+- [Quick Start Guide](https://github.com/j1s4nn/jevXagent/blob/main/QUICKSTART.md)
+- [Implementation Report](https://github.com/j1s4nn/jevXagent/blob/main/IMPLEMENTATION_REPORT.md)
+- [Contributing](https://github.com/j1s4nn/jevXagent/blob/main/CONTRIBUTING.md)
 
 ### Full Changelog
 
-See [CHANGELOG.md](https://github.com/j1s4nn/jevXagent-v0.2/blob/main/CHANGELOG.md)
+See [CHANGELOG.md](https://github.com/j1s4nn/jevXagent/blob/main/CHANGELOG.md)
 ```
 
 ## Step 4: SEO Optimization Actions
@@ -164,7 +164,7 @@ Make your AI coding agents 3× faster & 80% cheaper
 
 Open source & production-ready
 
-https://github.com/j1s4nn/jevXagent-v0.2
+https://github.com/j1s4nn/jevXagent
 
 #AI #LLM #DeveloperTools #OpenSource
 ```
@@ -190,7 +190,7 @@ Perfect for:
 - Startups managing AI costs
 - Anyone who wants faster AI responses
 
-Check it out: https://github.com/j1s4nn/jevXagent-v0.2
+Check it out: https://github.com/j1s4nn/jevXagent
 
 #ArtificialIntelligence #MachineLearning #DeveloperTools #OpenSource #LLM #CostOptimization
 ```
@@ -210,7 +210,7 @@ Real performance from production use:
 
 Works with Claude Code, Codex, Kilo Code, and Cline. Zero config needed - just start the proxy and point your agent at localhost:9099.
 
-Repo: https://github.com/j1s4nn/jevXagent-v0.2
+Repo: https://github.com/j1s4nn/jevXagent
 
 Would love feedback from the community!
 ```
@@ -219,7 +219,7 @@ Would love feedback from the community!
 
 Go to repo settings and add:
 
-**Website:** https://github.com/j1s4nn/jevXagent-v0.2
+**Website:** https://github.com/j1s4nn/jevXagent
 
 **Description:** 
 ```
@@ -291,7 +291,7 @@ Transparent proxy that makes AI coding agents faster and cheaper through intelli
 - 🎯 75% cost savings
 - 🔧 Zero config required
 
-[View on GitHub](https://github.com/j1s4nn/jevXagent-v0.2)
+[View on GitHub](https://github.com/j1s4nn/jevXagent)
 ```
 
 ## Step 7: Monitor & Iterate

@@ -1,94 +1,93 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 700">
   <defs>
     <style>
-      .title { font: bold 24px sans-serif; fill: #1a1a1a; }
-      .subtitle { font: 16px sans-serif; fill: #666; }
-      .label { font: 14px sans-serif; fill: #333; }
-      .metric { font: bold 14px sans-serif; fill: #0066cc; }
-      .box { fill: #f8f9fa; stroke: #dee2e6; stroke-width: 2; }
-      .highlight { fill: #e7f3ff; stroke: #0066cc; stroke-width: 2; }
-      .jev-box { fill: #fff3cd; stroke: #ffc107; stroke-width: 2; }
-      .arrow { stroke: #495057; stroke-width: 2; fill: none; marker-end: url(#arrowhead); }
-      .fast-arrow { stroke: #28a745; stroke-width: 3; fill: none; marker-end: url(#arrowhead-fast); }
+      .title { font: bold 26px 'Segoe UI', Arial, sans-serif; fill: #1a1a1a; }
+      .subtitle { font: 16px 'Segoe UI', Arial, sans-serif; fill: #666; }
+      .label { font: 15px 'Segoe UI', Arial, sans-serif; fill: #333; }
+      .label-small { font: 13px 'Segoe UI', Arial, sans-serif; fill: #555; }
+      .metric { font: bold 14px 'Segoe UI', Arial, sans-serif; fill: #0066cc; }
+      .code { font: 12px 'Courier New', monospace; fill: #2d3748; }
+      .box { fill: #f7fafc; stroke: #cbd5e0; stroke-width: 2; }
+      .highlight { fill: #ebf8ff; stroke: #4299e1; stroke-width: 2.5; }
+      .jev-box { fill: #fffbeb; stroke: #f59e0b; stroke-width: 2.5; }
+      .performance-box { fill: #f0fdf4; stroke: #22c55e; stroke-width: 2; }
     </style>
-    <marker id="arrowhead" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
-      <polygon points="0 0, 10 3, 0 6" fill="#495057" />
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+      <polygon points="0 0, 10 3, 0 6" fill="#718096"/>
     </marker>
-    <marker id="arrowhead-fast" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
-      <polygon points="0 0, 10 3, 0 6" fill="#28a745" />
+    <marker id="arrow-fast" markerWidth="12" markerHeight="12" refX="10" refY="3" orient="auto">
+      <polygon points="0 0, 12 3, 0 6" fill="#22c55e"/>
     </marker>
   </defs>
 
   <!-- Title -->
-  <text x="400" y="30" text-anchor="middle" class="title">jevXagent Architecture</text>
-  <text x="400" y="55" text-anchor="middle" class="subtitle">Line J: Fast Decisions → Smart Generation</text>
+  <text x="450" y="40" text-anchor="middle" class="title">jevXagent Architecture</text>
+  <text x="450" y="65" text-anchor="middle" class="subtitle">Intelligent Request Routing with Line J Injection</text>
 
   <!-- User -->
-  <rect x="340" y="80" width="120" height="50" class="box" rx="5"/>
-  <text x="400" y="110" text-anchor="middle" class="label">User Prompt</text>
+  <rect x="370" y="100" width="160" height="55" class="box" rx="8"/>
+  <text x="450" y="133" text-anchor="middle" class="label">👤 User Request</text>
 
-  <!-- Arrow to Agent -->
-  <path d="M 400 130 L 400 170" class="arrow"/>
+  <path d="M 450 155 L 450 190" stroke="#718096" stroke-width="2.5" marker-end="url(#arrow)"/>
 
   <!-- AI Agent -->
-  <rect x="280" y="170" width="240" height="50" class="highlight" rx="5"/>
-  <text x="400" y="200" text-anchor="middle" class="label">AI Agent (Claude/Codex/Kilo/Cline)</text>
+  <rect x="310" y="190" width="280" height="55" class="highlight" rx="8"/>
+  <text x="450" y="223" text-anchor="middle" class="label">AI Agent (Claude/Codex/Kilo/Cline)</text>
 
-  <!-- Arrow to Proxy -->
-  <path d="M 400 220 L 400 260" class="arrow"/>
+  <path d="M 450 245 L 450 280" stroke="#718096" stroke-width="2.5" marker-end="url(#arrow)"/>
 
   <!-- jevXagent Proxy -->
-  <rect x="280" y="260" width="240" height="50" class="highlight" rx="5"/>
-  <text x="400" y="285" text-anchor="middle" class="label">jevXagent Proxy</text>
-  <text x="400" y="300" text-anchor="middle" class="metric">localhost:9099</text>
+  <rect x="310" y="280" width="280" height="65" class="highlight" rx="8"/>
+  <text x="450" y="308" text-anchor="middle" class="label" font-weight="bold">jevXagent Proxy</text>
+  <text x="450" y="330" text-anchor="middle" class="metric">localhost:9099</text>
 
-  <!-- Arrow to Jev -->
-  <path d="M 400 310 L 200 360" class="fast-arrow"/>
-  <text x="280" y="340" class="metric">120ms</text>
+  <!-- Fork to Jev and Context -->
+  <path d="M 450 345 L 250 400" stroke="#22c55e" stroke-width="3.5" marker-end="url(#arrow-fast)"/>
+  <text x="330" y="375" class="metric">120ms</text>
 
   <!-- Jev Decision Engine -->
-  <rect x="80" y="360" width="240" height="80" class="jev-box" rx="5"/>
-  <text x="200" y="390" text-anchor="middle" class="label">Jev Decision Engine</text>
-  <text x="200" y="410" text-anchor="middle" class="metric">System 1: Fast Classification</text>
-  <text x="200" y="428" text-anchor="middle" class="label">Category: DevOps</text>
+  <rect x="100" y="400" width="300" height="100" class="jev-box" rx="8"/>
+  <text x="250" y="430" text-anchor="middle" class="label" font-weight="bold">Jev Decision Engine</text>
+  <text x="250" y="455" text-anchor="middle" class="metric">System 1: Fast Classification</text>
+  <line x1="120" y1="465" x2="380" y2="465" stroke="#f59e0b" stroke-width="1" opacity="0.3"/>
+  <text x="250" y="485" text-anchor="middle" class="label-small">Category: DevOps • Action: kubectl</text>
 
-  <!-- Arrow: Line J -->
-  <path d="M 320 400 L 400 400 L 400 360" class="fast-arrow"/>
-  <rect x="330" y="390" width="60" height="20" fill="#28a745" rx="3"/>
-  <text x="360" y="404" text-anchor="middle" fill="white" style="font: bold 12px sans-serif;">Line J</text>
+  <!-- Line J Injection Arrow -->
+  <path d="M 400 450 L 480 450 L 480 395" stroke="#22c55e" stroke-width="3.5" marker-end="url(#arrow-fast)"/>
+  <rect x="400" y="438" width="70" height="24" fill="#f59e0b" rx="6"/>
+  <text x="435" y="455" text-anchor="middle" style="font: bold 13px 'Segoe UI'; fill: white;">Line J</text>
 
-  <!-- Context Injection -->
-  <rect x="520" y="270" width="240" height="140" class="highlight" rx="5"/>
-  <text x="640" y="295" text-anchor="middle" class="label">Context Injection</text>
-  <text x="640" y="320" text-anchor="middle" style="font: 12px monospace;">system: "EXECUTION CONTEXT:</text>
-  <text x="640" y="340" text-anchor="middle" style="font: 12px monospace;">Category: DevOps</text>
-  <text x="640" y="360" text-anchor="middle" style="font: 12px monospace;">Action: Generate kubectl</text>
-  <text x="640" y="380" text-anchor="middle" style="font: 12px monospace;">script only"</text>
-  <text x="640" y="400" text-anchor="middle" style="font: 12px monospace;">user: "restart the pod"</text>
+  <!-- Context Injection Box -->
+  <rect x="570" y="300" width="290" height="160" class="highlight" rx="8"/>
+  <text x="715" y="325" text-anchor="middle" class="label" font-weight="bold">Injected Context</text>
+  <line x1="590" y1="335" x2="840" y2="335" stroke="#4299e1" stroke-width="1" opacity="0.3"/>
+  <text x="715" y="355" text-anchor="middle" class="code">system: {</text>
+  <text x="715" y="375" text-anchor="middle" class="code">  "context": "DevOps",</text>
+  <text x="715" y="395" text-anchor="middle" class="code">  "action": "kubectl",</text>
+  <text x="715" y="415" text-anchor="middle" class="code">  "urgency": "high"</text>
+  <text x="715" y="435" text-anchor="middle" class="code">}</text>
 
-  <!-- Arrow from proxy to context -->
-  <path d="M 520 285 L 560 285" class="arrow"/>
-
-  <!-- Arrow to Main LLM -->
-  <path d="M 400 360 L 400 460" class="arrow"/>
+  <path d="M 570 380 L 520 345" stroke="#718096" stroke-width="2" stroke-dasharray="4,4"/>
 
   <!-- Main Agent LLM -->
-  <rect x="280" y="460" width="240" height="80" class="box" rx="5"/>
-  <text x="400" y="490" text-anchor="middle" class="label">Main Agent LLM</text>
-  <text x="400" y="510" text-anchor="middle" class="metric">System 2: Generation Only</text>
-  <text x="400" y="528" text-anchor="middle" class="label">890ms - 48 tokens</text>
+  <path d="M 450 395 L 450 520" stroke="#718096" stroke-width="2.5" marker-end="url(#arrow)"/>
 
-  <!-- Arrow to Response -->
-  <path d="M 400 540 L 400 570" class="arrow"/>
+  <rect x="310" y="520" width="280" height="90" class="box" rx="8"/>
+  <text x="450" y="550" text-anchor="middle" class="label" font-weight="bold">Main Agent LLM</text>
+  <text x="450" y="575" text-anchor="middle" class="metric">System 2: Generation Only</text>
+  <text x="450" y="600" text-anchor="middle" class="label-small">890ms • 48 tokens</text>
+
+  <path d="M 450 610 L 450 645" stroke="#718096" stroke-width="2.5" marker-end="url(#arrow)"/>
 
   <!-- Final Response -->
-  <rect x="340" y="570" width="120" height="30" class="box" rx="5"/>
-  <text x="400" y="590" text-anchor="middle" class="label">Response</text>
+  <rect x="370" y="645" width="160" height="40" class="box" rx="8"/>
+  <text x="450" y="670" text-anchor="middle" class="label">✓ Response</text>
 
-  <!-- Performance Box -->
-  <rect x="20" y="480" width="220" height="100" fill="#d4edda" stroke="#28a745" stroke-width="2" rx="5"/>
-  <text x="130" y="505" text-anchor="middle" style="font: bold 16px sans-serif; fill: #155724;">Performance Gains</text>
-  <text x="130" y="530" text-anchor="middle" style="font: 14px sans-serif; fill: #155724;">3x Faster</text>
-  <text x="130" y="550" text-anchor="middle" style="font: 14px sans-serif; fill: #155724;">80% Token Savings</text>
-  <text x="130" y="570" text-anchor="middle" style="font: 14px sans-serif; fill: #155724;">75% Cost Reduction</text>
+  <!-- Performance Stats Box -->
+  <rect x="40" y="550" width="240" height="120" class="performance-box" rx="8"/>
+  <text x="160" y="575" text-anchor="middle" style="font: bold 17px 'Segoe UI'; fill: #15803d;">Performance Gains</text>
+  <line x1="60" y1="585" x2="260" y2="585" stroke="#22c55e" stroke-width="1" opacity="0.3"/>
+  <text x="160" y="608" text-anchor="middle" style="font: 15px 'Segoe UI'; fill: #166534;">⚡ 3× Faster</text>
+  <text x="160" y="633" text-anchor="middle" style="font: 15px 'Segoe UI'; fill: #166534;">💰 80% Token Savings</text>
+  <text x="160" y="658" text-anchor="middle" style="font: 15px 'Segoe UI'; fill: #166534;">💵 75% Cost Reduction</text>
 </svg>
