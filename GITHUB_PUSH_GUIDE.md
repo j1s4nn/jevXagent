@@ -52,7 +52,7 @@ cost-optimization
 
 ```bash
 # Navigate to project
-cd /path/to/jevXagent-v0.2
+cd /path/to/jevXagent
 
 # Add all files
 git add .
