@@ -1,0 +1,21 @@
+name: jevXagent
+description: Transparent proxy that makes AI coding agents 3x faster and 80% cheaper through intelligent request routing. Cut response times from 2.4s to 890ms with Line J architecture.
+
+topics:
+  - ai-agent
+  - llm-optimization
+  - proxy-server
+  - token-reduction
+  - claude-code
+  - ai-cost-reduction
+  - intelligent-routing
+  - fastapi
+  - jev-integration
+  - ai-performance
+  - developer-tools
+  - machine-learning
+  - prompt-optimization
+  - ai-infrastructure
+  - anthropic
+
+homepage: https://github.com/j1s4nn/jevXagent-v0.2

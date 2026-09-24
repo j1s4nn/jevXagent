@@ -1,0 +1,94 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600">
+  <defs>
+    <style>
+      .title { font: bold 24px sans-serif; fill: #1a1a1a; }
+      .subtitle { font: 16px sans-serif; fill: #666; }
+      .label { font: 14px sans-serif; fill: #333; }
+      .metric { font: bold 14px sans-serif; fill: #0066cc; }
+      .box { fill: #f8f9fa; stroke: #dee2e6; stroke-width: 2; }
+      .highlight { fill: #e7f3ff; stroke: #0066cc; stroke-width: 2; }
+      .jev-box { fill: #fff3cd; stroke: #ffc107; stroke-width: 2; }
+      .arrow { stroke: #495057; stroke-width: 2; fill: none; marker-end: url(#arrowhead); }
+      .fast-arrow { stroke: #28a745; stroke-width: 3; fill: none; marker-end: url(#arrowhead-fast); }
+    </style>
+    <marker id="arrowhead" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+      <polygon points="0 0, 10 3, 0 6" fill="#495057" />
+    </marker>
+    <marker id="arrowhead-fast" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+      <polygon points="0 0, 10 3, 0 6" fill="#28a745" />
+    </marker>
+  </defs>
+
+  <!-- Title -->
+  <text x="400" y="30" text-anchor="middle" class="title">jevXagent Architecture</text>
+  <text x="400" y="55" text-anchor="middle" class="subtitle">Line J: Fast Decisions → Smart Generation</text>
+
+  <!-- User -->
+  <rect x="340" y="80" width="120" height="50" class="box" rx="5"/>
+  <text x="400" y="110" text-anchor="middle" class="label">User Prompt</text>
+
+  <!-- Arrow to Agent -->
+  <path d="M 400 130 L 400 170" class="arrow"/>
+
+  <!-- AI Agent -->
+  <rect x="280" y="170" width="240" height="50" class="highlight" rx="5"/>
+  <text x="400" y="200" text-anchor="middle" class="label">AI Agent (Claude/Codex/Kilo/Cline)</text>
+
+  <!-- Arrow to Proxy -->
+  <path d="M 400 220 L 400 260" class="arrow"/>
+
+  <!-- jevXagent Proxy -->
+  <rect x="280" y="260" width="240" height="50" class="highlight" rx="5"/>
+  <text x="400" y="285" text-anchor="middle" class="label">jevXagent Proxy</text>
+  <text x="400" y="300" text-anchor="middle" class="metric">localhost:9099</text>
+
+  <!-- Arrow to Jev -->
+  <path d="M 400 310 L 200 360" class="fast-arrow"/>
+  <text x="280" y="340" class="metric">120ms</text>
+
+  <!-- Jev Decision Engine -->
+  <rect x="80" y="360" width="240" height="80" class="jev-box" rx="5"/>
+  <text x="200" y="390" text-anchor="middle" class="label">Jev Decision Engine</text>
+  <text x="200" y="410" text-anchor="middle" class="metric">System 1: Fast Classification</text>
+  <text x="200" y="428" text-anchor="middle" class="label">Category: DevOps</text>
+
+  <!-- Arrow: Line J -->
+  <path d="M 320 400 L 400 400 L 400 360" class="fast-arrow"/>
+  <rect x="330" y="390" width="60" height="20" fill="#28a745" rx="3"/>
+  <text x="360" y="404" text-anchor="middle" fill="white" style="font: bold 12px sans-serif;">Line J</text>
+
+  <!-- Context Injection -->
+  <rect x="520" y="270" width="240" height="140" class="highlight" rx="5"/>
+  <text x="640" y="295" text-anchor="middle" class="label">Context Injection</text>
+  <text x="640" y="320" text-anchor="middle" style="font: 12px monospace;">system: "EXECUTION CONTEXT:</text>
+  <text x="640" y="340" text-anchor="middle" style="font: 12px monospace;">Category: DevOps</text>
+  <text x="640" y="360" text-anchor="middle" style="font: 12px monospace;">Action: Generate kubectl</text>
+  <text x="640" y="380" text-anchor="middle" style="font: 12px monospace;">script only"</text>
+  <text x="640" y="400" text-anchor="middle" style="font: 12px monospace;">user: "restart the pod"</text>
+
+  <!-- Arrow from proxy to context -->
+  <path d="M 520 285 L 560 285" class="arrow"/>
+
+  <!-- Arrow to Main LLM -->
+  <path d="M 400 360 L 400 460" class="arrow"/>
+
+  <!-- Main Agent LLM -->
+  <rect x="280" y="460" width="240" height="80" class="box" rx="5"/>
+  <text x="400" y="490" text-anchor="middle" class="label">Main Agent LLM</text>
+  <text x="400" y="510" text-anchor="middle" class="metric">System 2: Generation Only</text>
+  <text x="400" y="528" text-anchor="middle" class="label">890ms - 48 tokens</text>
+
+  <!-- Arrow to Response -->
+  <path d="M 400 540 L 400 570" class="arrow"/>
+
+  <!-- Final Response -->
+  <rect x="340" y="570" width="120" height="30" class="box" rx="5"/>
+  <text x="400" y="590" text-anchor="middle" class="label">Response</text>
+
+  <!-- Performance Box -->
+  <rect x="20" y="480" width="220" height="100" fill="#d4edda" stroke="#28a745" stroke-width="2" rx="5"/>
+  <text x="130" y="505" text-anchor="middle" style="font: bold 16px sans-serif; fill: #155724;">Performance Gains</text>
+  <text x="130" y="530" text-anchor="middle" style="font: 14px sans-serif; fill: #155724;">3x Faster</text>
+  <text x="130" y="550" text-anchor="middle" style="font: 14px sans-serif; fill: #155724;">80% Token Savings</text>
+  <text x="130" y="570" text-anchor="middle" style="font: 14px sans-serif; fill: #155724;">75% Cost Reduction</text>
+</svg>

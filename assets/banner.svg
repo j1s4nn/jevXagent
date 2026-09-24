@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 300">
+  <defs>
+    <linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#667eea;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#764ba2;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="grad2" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#f093fb;stop-opacity:0.3" />
+      <stop offset="100%" style="stop-color:#f5576c;stop-opacity:0.3" />
+    </linearGradient>
+    <style>
+      .title { font: bold 72px sans-serif; fill: white; }
+      .version { font: 32px sans-serif; fill: #ffd700; }
+      .tagline { font: 28px sans-serif; fill: #e0e0e0; }
+      .stat { font: bold 36px sans-serif; fill: #ffd700; }
+      .stat-label { font: 18px sans-serif; fill: white; }
+    </style>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="300" fill="url(#grad1)"/>
+  <rect width="1200" height="300" fill="url(#grad2)"/>
+
+  <!-- Circuit pattern overlay -->
+  <g opacity="0.1">
+    <circle cx="100" cy="50" r="30" fill="none" stroke="white" stroke-width="2"/>
+    <circle cx="1100" cy="250" r="40" fill="none" stroke="white" stroke-width="2"/>
+    <line x1="130" y1="50" x2="200" y2="50" stroke="white" stroke-width="2"/>
+    <line x1="1000" y1="250" x2="1060" y2="250" stroke="white" stroke-width="2"/>
+  </g>
+
+  <!-- Lightning bolt decoration -->
+  <g transform="translate(50, 100)">
+    <polygon points="20,0 0,30 12,30 0,60 35,20 20,20" fill="#ffd700" opacity="0.8"/>
+  </g>
+
+  <!-- Main Title -->
+  <text x="140" y="130" class="title">jevXagent</text>
+  <text x="640" y="130" class="version">v0.2</text>
+
+  <!-- Tagline -->
+  <text x="140" y="175" class="tagline">Make Your AI Agents 3x Faster - Save 80% on Tokens</text>
+
+  <!-- Stats Bar -->
+  <g transform="translate(140, 210)">
+    <!-- Stat 1 -->
+    <rect x="0" y="0" width="200" height="60" fill="rgba(255,255,255,0.1)" rx="8"/>
+    <text x="100" y="30" text-anchor="middle" class="stat">3x</text>
+    <text x="100" y="50" text-anchor="middle" class="stat-label">Faster</text>
+
+    <!-- Stat 2 -->
+    <rect x="220" y="0" width="200" height="60" fill="rgba(255,255,255,0.1)" rx="8"/>
+    <text x="320" y="30" text-anchor="middle" class="stat">80%</text>
+    <text x="320" y="50" text-anchor="middle" class="stat-label">Token Savings</text>
+
+    <!-- Stat 3 -->
+    <rect x="440" y="0" width="200" height="60" fill="rgba(255,255,255,0.1)" rx="8"/>
+    <text x="540" y="30" text-anchor="middle" class="stat">75%</text>
+    <text x="540" y="50" text-anchor="middle" class="stat-label">Cost Reduction</text>
+  </g>
+</svg>

@@ -1,0 +1,20 @@
+{
+  "jev": {
+    "api_key": "your-jev-api-key-here",
+    "base_url": "https://api.typesafe.ai/v1",
+    "model": "jev-1",
+    "timeout": 0.8
+  },
+  "agent": {
+    "api_key": "your-agent-api-key-here",
+    "base_url": "https://api.anthropic.com",
+    "model": "claude-sonnet-4-20250514"
+  },
+  "proxy": {
+    "host": "127.0.0.1",
+    "port": 9099
+  },
+  "jev_enabled": true,
+  "stats_path": "./jevxagent_stats.jsonl",
+  "agent_type": "claude-code"
+}
