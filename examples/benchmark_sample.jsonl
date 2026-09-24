@@ -1,6 +1,0 @@
-{"question": "Is this a GitHub repository URL?", "context": "The user supplied: https://github.com/j1s4nn/jevXagent", "options": [], "expected": "YES", "decision_type": "binary_decision"}
-{"question": "Which category does this object belong to?", "context": "Object: an HTTP POST endpoint that returns JSON.", "options": ["API endpoint", "database table", "CSS file"], "expected": "API endpoint", "decision_type": "multiple_choice"}
-{"question": "Is this result valid JSON?", "context": "Result: {\"a\": 1}", "options": [], "expected": "YES", "decision_type": "verification"}
-{"question": "Is this result relevant to the query?", "context": "Query: python requests library. Result: httpx is an HTTP client library.", "options": [], "expected": "YES", "decision_type": "relevance"}
-{"question": "Extract the repository name.", "context": "URL: https://github.com/j1s4nn/jevXagent", "options": [], "expected": "jevXagent", "decision_type": "simple_extraction"}
-{"question": "Which operation should the agent run next?", "context": "Repository fetched. Next: either list files or clone.", "options": ["list files", "clone repository", "delete cache"], "expected": "list files", "decision_type": "next_action"}

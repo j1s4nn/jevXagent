@@ -1,0 +1,1477 @@
+# jevXagent v0.2
+
+You are working directly inside my local project:
+
+C:\Users\jisan\OneDrive\Desktop\Jev\jevXagent-v0.2
+
+My target: 
+1. Significantly reduce tokens but keep the high-quality result.
+2. Significantly reduce latency. and output and thinking time.
+3. use across all the agents. and setup only on one agent not all agent. if user want to setup other agent that time user must run another command, that command help to switch current agent to another. so that current agent can run without any problem. 
+4. After setup, all agent works like old. just now stronger then previous.
+
+The primary objective is:
+
+> Jev performs fast decisions/routing/backend work first.
+> The main agent model only performs generation/work that still requires an LLM.
+> Jev's result must be injected into the SAME agent request so the main model sees the completed Jev decision/context before generating its answer.
+
+The architecture should avoid MCP and client hooks on the normal hot path.
+
+==================================================
+0. SOURCE OF TRUTH
+==================
+
+Use these sources of truth in this order:
+
+1. The actual repository code in:
+   C:\Users\jisan\OneDrive\Desktop\Jev\jevXagent-v0.2
+
+2. "C:\Users\jisan\OneDrive\Desktop\Jev\jevXagent-v0.2\jevXagent_v0.2.md"
+
+3. This prompt.
+
+
+Do not invent existing functionality.
+
+When something is not implemented, explicitly identify it as missing and implement it only when required by this specification.
+
+Do not silently replace working components just because a different implementation looks cleaner.
+
+
+
+==================================================
+2. MOST IMPORTANT ARCHITECTURAL RULE
+====================================
+
+The system must NOT assume that a standalone daemon automatically sees traffic from every AI coding agent.
+
+A proxy only works when the selected agent actually routes its API requests through the proxy.
+
+Therefore create an abstraction:
+
+Agent Integration Layer
+
+with responsibilities:
+
+1. detect installed agents
+2. detect usable agent executable
+3. identify supported provider/transport
+4. determine how the agent can route API traffic through JevXagent
+5. configure routing without modifying agent internals
+6. launch or connect to the agent
+7. restore temporary environment/configuration when appropriate
+8. report unsupported integration clearly
+
+Do NOT assume all four clients use the same API format.
+
+Supported agent candidates:
+
+* Claude Code
+* Codex
+* Kilo Code
+* Cline
+
+The CLI should detect which ones actually exist on the local machine.
+
+If a client is not installed:
+
+* do NOT display it as available
+* do NOT fabricate support
+* keep it out of selectable integrations
+
+If zero supported agents are found:
+
+* report zero available agents
+* exit cleanly
+
+==================================================
+3. CLI1 CONFIGURATION
+=====================
+
+CRITICAL:
+
+All API keys, API URLs/base URLs, and model names must be requested/configured through CLI1.
+
+Never hard-code:
+
+* Jev API key
+* Jev base URL
+* Jev model
+* agent API key
+* agent base URL
+* agent model
+
+Do not embed secrets in source code.
+
+The configuration flow should conceptually be:
+
+jevXagent
+↓
+detect agents
+↓
+select agent
+↓
+ask CLI1 for Jev API
+↓
+ask CLI1 for Jev base URL
+↓
+ask CLI1 for Jev model
+↓
+ask CLI1 for agent API
+↓
+ask CLI1 for agent base URL
+↓
+ask CLI1 for agent model
+↓
+validate configuration
+↓
+start daemon/proxy
+
+Use the project's existing CLI architecture if one exists.
+
+Do not invent a second unrelated configuration system.
+
+If CLI1 already has configuration helpers, reuse them.
+
+If credentials must be stored persistently, use the safest existing project mechanism. Never print secrets in logs.
+
+==================================================
+4. AGENT ADAPTER ARCHITECTURE
+=============================
+
+Do NOT put Claude-specific, Codex-specific, Kilo-specific, or Cline-specific conditions throughout the codebase.
+
+Create a clean adapter architecture, for example:
+
+AgentAdapter
+├── ClaudeAdapter
+├── CodexAdapter
+├── KiloAdapter
+└── ClineAdapter
+
+Use the actual project language/style instead of blindly copying this exact class structure.
+
+Each adapter should define only what is genuinely agent-specific:
+
+* executable detection
+* capability detection
+* environment/base URL configuration
+* authentication configuration
+* API format
+* request transformation if necessary
+* response/stream handling if necessary
+* launch behavior if needed
+
+The shared proxy/decision/metrics logic must stay provider-agnostic.
+
+==================================================
+5. TRANSPORT REQUIREMENT
+========================
+
+The proxy must support the actual transport used by the selected agent.
+
+Do not pretend that all agents expose OpenAI-compatible requests.
+
+Detect whether the selected integration uses:
+
+* OpenAI-compatible API
+* Anthropic-compatible API
+* another supported API
+
+Implement adapters only where justified by the actual repository and agent behavior.
+
+If an agent cannot safely be routed through the current proxy architecture:
+
+* do not fake success
+* report that the integration is unsupported
+* do not modify its internal implementation
+* keep the core JevXagent architecture intact
+
+The objective is reliability, not claiming universal compatibility.
+
+==================================================
+6. HOT-PATH ARCHITECTURE
+========================
+
+The normal request path should be:
+
+USER
+↓
+AGENT
+↓
+jevXagent
+↓
+Jev evaluation
+↓
+Jev/backend execution
+↓
+create structured Jev execution context
+↓
+send original request + Jev context to main agent model
+↓
+stream final response
+↓
+collect metrics
+
+The main agent should NOT perform classification that Jev already solved.
+
+The main agent should NOT rediscover backend state that Jev already executed.
+
+The main agent should receive Jev's result directly.
+
+This is the fundamental purpose of "line j".
+
+==================================================
+7. STRUCTURED JEV CONTEXT
+=========================
+
+Do not rely on uncontrolled string concatenation.
+
+Create a structured internal representation for Jev execution context.
+
+Example conceptual schema:
+
+{
+"schema_version": "1",
+"trace_id": "...",
+"jev_status": "success",
+"decisions": {...},
+"backend_actions": [...],
+"facts": {...},
+"needs_generation": true,
+"agent_instructions": "...",
+"timing": {...}
+}
+
+Then serialize this into the target agent's supported context format.
+
+The context must clearly indicate:
+
+THIS IS SYSTEM-GENERATED EXECUTION CONTEXT.
+
+The agent must understand:
+
+* what Jev decided
+* which backend actions already completed
+* what facts are authoritative
+* whether generation is still required
+* what remains for the agent to do
+
+note: if prompt includes iamge, pdfs, docs, then automatically bypass to llm. ( marked this part. because, after some day, I make a new architecture that can convert image, pdfs, docs into understandable formate so that jev can work)
+
+
+==================================================
+8. LINE-J INJECTION RULE
+========================
+
+The request transformation should conceptually be:
+
+ORIGINAL AGENT REQUEST
+
+*
+
+TRUSTED JEV EXECUTION CONTEXT
+
+→
+
+FINAL REQUEST TO MAIN AGENT
+
+The main agent must see the Jev result BEFORE producing output.
+
+Do not make Jev's decision a separate unrelated API call that the main agent cannot see.
+
+Do not call the main model once for Jev reasoning and another time for the same reasoning.
+
+Jev is the fast decision engine.
+
+The main agent is the generation/work engine.
+
+==================================================
+9. GENERATION BYPASS
+====================
+
+Implement:
+
+needs_generation = false
+
+as a true fast path.
+
+If Jev can completely satisfy the request without the main LLM:
+
+* execute the deterministic/backend action
+* produce the final response from trusted results
+* do NOT call the main agent
+* record `agent_called = false`
+* record `bypass_reason`
+
+Example states:
+
+jev_status:
+success
+timeout
+error
+disabled
+
+generation:
+required
+bypassed
+
+Do NOT bypass the main model merely because Jev classified the request.
+
+Bypass only when the complete final result is available without LLM generation.
+
+==================================================
+10. JEV ON / OFF MODE
+=====================
+
+The CLI must have a Jev ON/OFF control.
+
+Jev ON:
+
+* evaluate through Jev
+* execute Jev actions
+* inject Jev context
+* perform bypass when allowed
+* measure Jev latency and tokens
+
+Jev OFF:
+
+* do NOT call Jev
+* do NOT inject Jev context
+* send the original request through the same agent path
+* still collect metrics
+* still measure agent latency/tokens
+
+IMPORTANT:
+
+Jev OFF should mean "same agent, no Jev optimization".
+
+Do not change unrelated variables between ON and OFF.
+
+This is necessary to make the comparison meaningful.
+
+==================================================
+11. TOKEN STATISTICS
+====================
+
+The CLI must show per request:
+
+Jev:
+
+* input tokens
+* output tokens, if available
+* total tokens, if available
+* latency
+* status
+
+Agent:
+
+* input tokens
+* output tokens
+* cached/input cached tokens if provider reports them
+* reasoning tokens if provider reports them
+* total tokens
+* time to first token, if measurable
+* total agent latency
+
+Overall:
+
+* total request latency
+* Jev latency
+* proxy overhead
+* agent latency
+* whether agent was called
+* whether bypass happened
+
+Do not estimate actual provider token usage when the provider gives authoritative usage data.
+
+Use API-reported usage fields whenever available.
+
+If not available:
+
+* report unavailable
+* optionally show an explicitly labelled estimate
+* never present an estimate as an actual usage number
+
+==================================================
+12. TOKEN SAVINGS
+=================
+
+Do NOT blindly display:
+
+"you saved 500 tokens"
+
+unless a defensible baseline exists.
+
+Implement two concepts:
+
+1. Actual usage
+2. Measured comparison
+
+The safest comparison is Jev ON vs Jev OFF.
+
+The statistics system should be able to compare:
+
+Jev ON:
+agent_input_tokens
+agent_output_tokens
+agent_total_tokens
+latency
+
+Jev OFF:
+agent_input_tokens
+agent_output_tokens
+agent_total_tokens
+latency
+
+Then calculate differences only when the comparison is valid.
+
+Never fabricate a baseline.
+
+When the baseline is unavailable, display:
+
+Savings: N/A
+
+not zero and not a guessed number.
+
+==================================================
+13. PRICING
+===========
+
+Pricing depends on the selected model/provider.
+
+The CLI must not contain hard-coded fake pricing.
+
+Create a pricing resolver abstraction.
+
+Priority:
+
+1. existing project/provider pricing information
+2. configured model pricing
+3. provider metadata if reliably available
+4. CLI1/user configuration if required
+5. otherwise N/A
+
+Never invent prices.
+
+Display:
+
+Jev cost
+Agent cost
+Estimated total cost
+Estimated saved cost
+
+only when the required pricing data actually exists.
+
+Store the pricing source/method in the stats record.
+
+==================================================
+14. JEV TIMEOUT / FAIL-OPEN
+===========================
+
+The proxy must stay responsive.
+
+Set a strict Jev timeout using the project's async/network architecture.
+
+Target behavior:
+
+Jev fast success
+→ continue normally
+
+Jev timeout
+→ immediately forward original request to agent
+→ mark Jev timeout
+→ do not block the user
+
+Jev error
+→ fail open
+→ forward original request
+→ mark Jev error
+
+Jev disabled
+→ directly forward original request
+
+Do not let the proxy become slower than the original agent simply because Jev was added.
+
+IMPORTANT:
+
+Introduce trace/request IDs.
+
+Use idempotency wherever Jev-side actions can cause external side effects.
+
+Think carefully about:
+
+"Jev may have executed the action but the response timed out."
+
+Do not create duplicate side effects during retries.
+
+==================================================
+15. BACKEND ACTIONS
+===================
+
+If Jev causes backend work:
+
+* keep execution separate from response generation
+* record each action
+* record action success/failure
+* record action latency
+* associate every action with trace_id
+* make repeatable actions idempotent where possible
+
+Do not block the request on slow nonessential work.
+
+If a backend action is expensive and the architecture permits it:
+
+* execute asynchronously
+* return/control the user-facing flow correctly
+* do not let unrelated background work inflate agent latency
+
+The system must distinguish:
+
+proxy latency
+Jev latency
+backend latency
+agent latency
+total wall-clock latency
+
+==================================================
+16. STREAMING
+=============
+
+Streaming support is mandatory.
+
+Do not implement the proxy using a request/response design that breaks streaming.
+
+Preserve:
+
+* first token timing
+* streamed chunks
+* finish reason
+* tool-call streaming
+* usage information when available
+* connection cancellation
+* client disconnects
+* provider-specific stream semantics
+
+The proxy must not buffer a huge model response unnecessarily.
+
+The user should receive the agent's stream normally.
+
+==================================================
+17. TOOL CALLS
+==============
+
+This is extremely important for coding agents.
+
+Do not break tool calls.
+
+Preserve:
+
+* tool definitions
+* tool calls
+* tool call IDs
+* tool results
+* assistant/tool message ordering
+* parallel tool calls when supported
+* provider-specific tool metadata
+
+Jev preprocessing must never accidentally convert a tool-driven agent session into a simple text-only session.
+
+The architecture should allow:
+
+user
+→ Jev
+→ agent
+→ tool call
+→ tool result
+→ agent continuation
+
+without losing state.
+
+==================================================
+18. MULTI-TURN CONVERSATIONS
+============================
+
+JevXagent must work across multiple turns.
+
+Do not rebuild the conversation incorrectly on every request.
+
+Each intercepted request should preserve the complete conversation context supplied by the agent.
+
+Jev's current-turn execution context should be injected only for that turn.
+
+Do not permanently contaminate the conversation with duplicate Jev metadata unless that is explicitly required.
+
+Do not repeatedly append old Jev decisions to every later request.
+
+
+==================================================
+20. PROJECT MODE vs GLOBAL MODE
+===============================
+
+Support two operating modes.
+
+PROJECT MODE:
+
+* only current project integration
+* current working directory is part of session identity
+* project-local stats
+* project-local configuration where appropriate
+* no accidental cross-project state
+
+GLOBAL MODE:
+
+* reusable installation/configuration
+* able to work with supported agents from different projects
+* shared global configuration
+* statistics may be global if explicitly selected
+
+Do not confuse:
+
+"global installation"
+
+with
+
+"global access to every secret or project."
+
+Keep scopes explicit.
+
+==================================================
+21. CTRL+C
+==========
+
+Running:
+
+jevxagent
+
+should remain active until the user presses Ctrl+C.
+
+Ctrl+C should:
+
+* stop the daemon cleanly
+* close network connections
+* restore temporary process configuration where necessary
+* flush pending metrics
+* exit with a clear status
+
+Do not leave zombie processes.
+
+==================================================
+22. CTRL+S STATISTICS SAVE
+==========================
+
+Implement Ctrl+S as a statistics snapshot/save command.
+
+At first run, ask where statistics should be saved.
+
+Or reuse an existing project configuration mechanism if the repository already has one.
+
+Each saved record should include:
+
+* timestamp
+* project
+* selected agent
+* agent model
+* Jev model
+* Jev enabled/disabled
+* trace ID
+* request ID
+* Jev status
+* Jev latency
+* Jev token usage
+* backend latency
+* agent TTFT
+* agent latency
+* agent input tokens
+* agent output tokens
+* total tokens
+* bypass status
+* pricing status
+* estimated cost if available
+* error/fallback status
+
+Prefer a durable machine-readable format such as JSONL/JSON plus an optional human-readable summary.
+
+Do not overwrite historical data accidentally.
+
+Include schema version.
+
+==================================================
+23. REAL-TIME CLI DISPLAY
+=========================
+
+For every agent prompt, display concise live statistics.
+
+Example conceptual output:
+
+────────────────────────────────────────
+jevXagent
+Agent: Claude Code
+Agent model: <model>
+Jev: ON
+
+Jev
+status       : success
+latency      : 142 ms
+input tokens : 31
+output       : 0
+
+Backend
+actions      : 2
+latency      : 18 ms
+
+Agent
+TTFT         : 310 ms
+input        : 1,842
+output       : 126
+latency      : 1.12 s
+
+Overall
+latency      : 1.29 s
+agent called : yes
+generation   : yes
+
+Cost
+Jev          : ...
+Agent        : ...
+Total        : ...
+
+Savings
+vs baseline  : ...
+────────────────────────────────────────
+
+Do not spam the terminal.
+
+Use one compact, readable block per request.
+
+==================================================
+24. IMPORTANT: LATENCY ACCOUNTING
+=================================
+
+Do not simply add every duration together if operations execute in parallel.
+
+Record:
+
+* wall_clock_start
+* wall_clock_end
+* Jev duration
+* backend duration
+* proxy transformation duration
+* agent TTFT
+* agent total duration
+
+Then calculate:
+
+total_wall_latency = wall_clock_end - wall_clock_start
+
+and separately show component timings.
+
+Do not claim:
+
+total = Jev + backend + agent
+
+when some of those overlap.
+
+==================================================
+25. NO MCP ON NORMAL HOT PATH
+=============================
+
+Do NOT introduce an MCP server into the normal request path unless the repository proves that MCP is required for a specific function.
+
+Do NOT add MCP simply because it is a common AI architecture pattern.
+
+The intended hot path is:
+
+Agent
+→ jevXagent
+→ Jev
+→ context injection
+→ Agent model
+
+not:
+
+Agent
+→ MCP
+→ Jev tool
+→ MCP
+→ Agent
+
+The purpose is to minimize unnecessary schema/tool-call/context overhead.
+
+==================================================
+26. NO CLIENT HOOK DEPENDENCY
+=============================
+
+Do not require:
+
+* Claude hooks
+* Kilo hooks
+* Cline hooks
+* Codex internal modifications
+
+for normal operation.
+
+Do not edit client source code.
+
+Use supported external configuration/routing mechanisms.
+
+If a specific agent integration requires a mechanism that cannot be avoided:
+
+* isolate it inside that adapter
+* document exactly why
+* do not leak the dependency into the core proxy architecture
+
+==================================================
+27. CONFIGURATION VALIDATION
+============================
+
+Before starting the proxy:
+
+validate:
+
+Jev API
+Jev base URL
+Jev model
+Agent API
+Agent base URL
+Agent model
+selected agent
+supported transport
+
+Perform a safe connection/configuration check when practical.
+
+Never print secret values.
+
+Error messages should identify:
+
+* what is missing
+* which component failed
+* whether the failure is recoverable
+
+==================================================
+28. OBSERVABILITY
+=================
+
+Every request should have:
+
+trace_id
+request_id
+agent_id
+project_id
+timestamp
+
+Use structured logging.
+
+Example internal states:
+
+REQUEST_RECEIVED
+JEV_DISABLED
+JEV_STARTED
+JEV_SUCCESS
+JEV_TIMEOUT
+JEV_ERROR
+BACKEND_STARTED
+BACKEND_SUCCESS
+BACKEND_ERROR
+GENERATION_BYPASS
+AGENT_REQUEST_SENT
+AGENT_STREAM_STARTED
+AGENT_STREAM_COMPLETED
+REQUEST_COMPLETED
+
+
+==================================================
+29. ERROR HANDLING
+==================
+
+The proxy must never crash because:
+
+* Jev is down
+* agent API is down
+* malformed Jev response
+* malformed agent response
+* unsupported streaming field
+* unexpected provider field
+* token usage missing
+* pricing missing
+* backend failure
+* client disconnect
+
+Each error should have:
+
+* internal technical detail
+* safe user-facing message
+* trace ID
+* appropriate fallback behavior
+
+==================================================
+30. TESTING REQUIREMENTS
+========================
+
+Before declaring the task complete, create/repair tests for:
+
+A. Jev enabled + generation required
+
+B. Jev enabled + generation bypass
+
+C. Jev disabled
+
+D. Jev timeout
+
+E. Jev error
+
+F. malformed Jev result
+
+G. backend action success
+
+H. backend action failure
+
+I. agent streaming
+
+J. tool calls
+
+K. multi-turn conversation
+
+L. token usage parsing
+
+M. pricing unavailable
+
+N. pricing available
+
+O. Ctrl+C shutdown
+
+P. Ctrl+S save
+
+Q. unsupported agent
+
+R. zero agents found
+
+S. supported agent detection
+
+T. project/global mode separation
+
+U. secrets not present in logs
+
+V. idempotent retry behavior
+
+W. request/trace correlation
+
+Use mocks/fakes for external APIs.
+
+Do not make the test suite dependent on real API credentials.
+
+If existing tests already cover some behavior, preserve them.
+
+==================================================
+31. INTEGRATION TESTS
+=====================
+
+Create a realistic fake flow:
+
+USER PROMPT
+→ fake Jev
+→ fake backend
+→ fake agent
+→ streamed response
+
+Verify that the agent receives:
+
+original user prompt
++
+Jev execution context
+
+and verify that the agent does not need to reclassify the task.
+
+Also test:
+
+Jev timeout
+→ original prompt reaches agent
+
+and:
+
+needs_generation=false
+→ fake agent is never called
+
+==================================================
+32. BENCHMARK
+=============
+
+Do not rely solely on theoretical statements about speed.
+
+Implement a benchmark/test mode if practical.
+
+Compare:
+
+MODE A:
+Jev OFF
+
+MODE B:
+Jev ON
+
+Measure:
+
+* Jev latency
+* agent TTFT
+* agent output tokens
+* total latency
+* total token usage
+* cost when pricing is available
+* bypass frequency
+
+Do not manipulate results.
+
+The benchmark should make it possible to determine whether JevXagent actually improves performance for this implementation.
+
+==================================================
+33. DO NOT OVER-ENGINEER
+========================
+
+Before adding a dependency, ask:
+
+1. Is it necessary?
+2. Is there already equivalent functionality in the repository?
+3. Does it increase startup time?
+4. Does it increase hot-path latency?
+5. Does it introduce another network dependency?
+6. Does it increase maintenance burden?
+
+Prefer simple standard-library functionality where reasonable.
+
+Do not add a framework merely to make architecture diagrams prettier.
+
+==================================================
+34. DO NOT REWRITE EVERYTHING
+=============================
+
+Preserve working components.
+
+Refactor only when necessary.
+
+Use small, logically separated changes.
+
+After each major modification:
+
+* run focused tests
+* then run the full test suite
+* fix regressions before continuing
+
+Do not leave the repository in a half-migrated state.
+
+==================================================
+35. CODE QUALITY
+================
+
+Follow the project's existing conventions.
+
+Use:
+
+* type hints/types where appropriate
+* clear interfaces
+* explicit error handling
+* small focused functions
+* deterministic behavior
+* structured data models
+* testable components
+
+Avoid:
+
+* giant functions
+* hidden global state
+* duplicated provider logic
+* magic constants
+* hard-coded credentials
+* silent exception swallowing
+* fake fallback values
+
+==================================================
+36. IMPORTANT PERFORMANCE RULE
+==============================
+
+The Jev path must not become an unnecessary bottleneck.
+
+Avoid:
+
+* repeated serialization/deserialization
+* unnecessary model calls
+* unnecessary MCP/tool roundtrips
+* synchronous blocking I/O
+* repeated configuration discovery during every request
+* repeated agent detection during every request
+* repeatedly loading pricing metadata
+* unnecessary prompt duplication
+
+Perform initialization once where possible.
+
+Cache safe static configuration.
+
+Keep request-specific state isolated.
+
+==================================================
+37. REQUEST EXECUTION ALGORITHM
+===============================
+
+Implement the equivalent of:
+
+1. Receive agent request.
+
+2. Create trace_id/request_id.
+
+3. Record request start timestamp.
+
+4. If Jev is OFF:
+   → forward original request
+   → collect agent metrics
+   → finish.
+
+5. If Jev is ON:
+   → call Jev with strict timeout.
+
+6. If Jev succeeds:
+   → validate result.
+
+7. Execute required backend actions.
+
+8. Construct structured Jev execution context.
+
+9. If Jev says complete generation is unnecessary:
+   → create final deterministic response
+   → return response
+   → record bypass.
+
+10. Otherwise:
+    → inject Jev execution context into the agent request.
+
+11. Send request to main agent model.
+
+12. Stream response back to user.
+
+13. Collect actual usage and timing.
+
+14. Calculate cost only when pricing is known.
+
+15. Save in-memory statistics.
+
+16. On Ctrl+S:
+    → persist snapshot.
+
+==================================================
+38. JEV RESULT VALIDATION
+=========================
+
+Do not trust malformed Jev responses blindly.
+
+Validate required fields.
+
+For example:
+
+* status
+* decisions
+* needs_generation
+* actions
+* context data
+
+If invalid:
+
+* mark Jev invalid
+* fail open
+* send original agent request
+* record validation failure
+
+Do not crash.
+
+==================================================
+39. PROVIDER-AGNOSTIC INTERNAL MODEL
+====================================
+
+Create a normalized internal representation where practical.
+
+For example:
+
+NormalizedRequest
+NormalizedMessage
+NormalizedTool
+NormalizedJevContext
+NormalizedUsage
+NormalizedMetrics
+
+Then implement provider-specific conversion at the edges.
+
+Do not force providers into the same internal structure when semantics genuinely differ.
+
+Preserve provider-specific fields when required.
+
+==================================================
+40. STARTUP EXPERIENCE
+======================
+
+When the user runs:
+
+jevxagent
+
+the CLI should clearly show:
+
+* discovered agents
+* selected agent
+* Jev status
+* project/global mode
+* proxy status
+* listening endpoint if applicable
+* statistics save location
+* Ctrl+S
+* Ctrl+C
+
+Do not print API keys.
+
+Example:
+
+jevXagent
+────────────────────────────
+Mode: Project
+Agent: Claude Code
+Jev: ON
+Jev model: configured
+Agent model: configured
+Proxy: READY
+Stats: <path>
+
+Ctrl+S  Save statistics
+Ctrl+C  Stop jevXagent
+────────────────────────────
+
+==================================================
+41. IMPORTANT AGENT DETECTION BEHAVIOR
+======================================
+
+At startup:
+
+detect:
+
+Claude Code
+Codex
+Kilo Code
+Cline
+
+based on actual local installation/executables/configuration.
+
+Display only detected agents.
+
+The selection UI must never claim:
+
+"Claude supported"
+
+unless the adapter has confirmed the current local integration can actually be used.
+
+A detected executable does NOT automatically mean the proxy integration is valid.
+
+The adapter must verify compatibility.
+
+==================================================
+42. CONFIGURATION SHOULD BE SESSION-SAFE
+========================================
+
+When jevXagent launches an agent through a temporary routing configuration:
+
+* apply the routing only to that launched process/session where possible
+* preserve the user's original configuration
+* restore temporary environment changes after termination
+* do not destroy existing provider settings
+
+This is especially important for users who switch between direct and Jev-routed usage.
+
+==================================================
+43. DOCUMENTATION
+=================
+
+After implementation, update the README with:
+
+* what jevXagent does
+* architecture
+* supported agent detection
+* supported integrations
+* startup
+* configuration through CLI1
+* Jev ON/OFF
+* statistics
+* project vs global mode
+* failure behavior
+* limitations
+
+Do NOT claim all AI coding agents are transparently supported unless the implementation actually proves it.
+
+Clearly label unsupported integrations.
+
+==================================================
+44. FINAL VALIDATION
+====================
+
+Before completion:
+
+1. Run formatting/linting if the repository has it.
+
+2. Run unit tests.
+
+3. Run integration tests.
+
+4. Run type checking if configured.
+
+5. Run the CLI in a safe fake/test configuration.
+
+6. Verify startup.
+
+7. Verify agent detection.
+
+8. Verify Jev ON.
+
+9. Verify Jev OFF.
+
+10. Verify bypass.
+
+11. Verify timeout fallback.
+
+12. Verify streaming.
+
+13. Verify metrics.
+
+14. Verify Ctrl+S.
+
+15. Verify Ctrl+C.
+
+16. Verify no secrets appear in logs.
+
+17. Verify project/global behavior.
+
+18. Verify all existing tests still pass.
+
+==================================================
+45. FINAL REPORT
+================
+
+When implementation is complete, do NOT give a vague summary.
+
+Report:
+
+A. What already existed.
+
+B. What was broken.
+
+C. What you changed.
+
+D. Why each major change was necessary.
+
+E. Current architecture.
+
+F. Supported agents detected by the implementation.
+
+G. Which agent integrations are actually working.
+
+H. Which integrations are unsupported and why.
+
+I. Test results.
+
+J. Remaining limitations.
+
+K. Files changed.
+
+L. How to run it.
+
+M. Example CLI output.
+
+N. Exact configuration values that CLI1 must ask for.
+
+O. Performance/benchmark results if implemented.
+
+==================================================
+46. ABSOLUTE PROHIBITIONS
+=========================
+
+DO NOT:
+
+* hard-code API keys
+* hard-code provider URLs
+* hard-code model names
+* invent pricing
+* invent token usage
+* fabricate agent support
+* assume a proxy can intercept traffic without routing
+* add MCP to the hot path
+* require client hooks for normal operation
+* modify upstream agent source code
+* silently discard tool calls
+* silently discard streaming
+* silently modify user prompts
+* log secrets
+* claim latency improvements without measurement
+* claim token savings without a valid baseline
+* rewrite the entire repository without justification
+
+==================================================
+47. CORE DESIGN PRINCIPLE
+=========================
+
+The whole system should follow this separation:
+
+JEV = FAST DECISION + ROUTING + DETERMINISTIC/BACKEND WORK
+
+MAIN AGENT = GENERATION + REASONING + CODING + USER-FACING WORK
+
+jevXagent = THE BRIDGE THAT CONNECTS THEM
+
+The main model should not waste computation rediscovering information Jev already determined.
+
+When Jev has completely solved the task:
+
+NO MAIN MODEL CALL.
+
+When generation is needed:
+
+Jev context
++
+original agent request
+→
+MAIN AGENT
+
+When Jev is unavailable:
+
+RAW ORIGINAL REQUEST
+→
+MAIN AGENT
+
+This is the core behavior to preserve.
+
+==================================================
+48. START NOW
+=============
+
+Do NOT ask me broad architecture questions before inspecting the repository.
+
+Start with:
+
+1. inspect repository
+2. inspect current architecture
+3. inspect current tests
+4. identify current execution path
+5. identify missing pieces
+6. write implementation audit
+7. implement the smallest coherent architecture
+8. test continuously
+9. fix regressions
+10. run final validation
+11. report exact results
+
+Only ask me for external runtime configuration when necessary.
+
+For all API keys, base URLs, and model names:
+
+USE CLI1 CONFIGURATION FLOW.
+
+Do not hard-code them.
+
+Do not stop after producing a plan.
+
+The goal is to actually modify the repository and make the implementation work.
+
+Note: jev is a decision model. 
+also, this jevXagent must have the ability to find out ClaudeCode's settings .json and other agents's json. so that it can implement API and base url.
+
+also in CLI terminal user some times put wrong api, then this jevXagent must have this ability to handle error. also throw a reasonable message. so that user copy that message to their ai. then that ai can help to fix that. 
